@@ -297,22 +297,6 @@ function setupSave() {
         });
     }
 }
-                    }
-                } else {
-                    bmcAlert(data.error || 'Failed to save', 'error');
-                }
-            } catch(e) {
-                bmcAlert('Failed to save program', 'error');
-            }
-        });
-    }
-
-    if (btnCancel) {
-        btnCancel.addEventListener('click', () => {
-            if (dialog) dialog.style.display = 'none';
-        });
-    }
-}
 
 // Export functionality
 function setupExport() {
