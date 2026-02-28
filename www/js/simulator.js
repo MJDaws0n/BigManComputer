@@ -8,6 +8,7 @@ let stepCount = 0;
 let isRunning = false;
 let runInterval = null;
 let wasRunningBeforeInput = false;
+let lastOutputLen = 0;
 
 const OPCODE_NAMES = {
     1: 'LDA', 2: 'STA', 3: 'ADD', 4: 'SUB', 5: 'MUL', 6: 'DIV', 7: 'MOD',
@@ -109,8 +110,12 @@ async function stepProgram() {
             stepCount++;
             updateVisualization(prevState);
 
-            if (data.output) {
-                appendOutput(data.output);
+            // Show only new output since last step
+            const fullOutput = data.state ? (data.state.output || '') : '';
+            if (fullOutput.length > lastOutputLen) {
+                const newPart = fullOutput.substring(lastOutputLen);
+                displayNewOutput(newPart);
+                lastOutputLen = fullOutput.length;
             }
 
             if (data.halted) {
@@ -215,6 +220,13 @@ async function sendInput() {
             appendInputDisplay(value);
             showInputBar(false);
             setStatus('ready', '● Step ' + stepCount);
+
+            // Show any new output from the INP step
+            const fullOutput = data.state ? (data.state.output || '') : '';
+            if (fullOutput.length > lastOutputLen) {
+                displayNewOutput(fullOutput.substring(lastOutputLen));
+                lastOutputLen = fullOutput.length;
+            }
 
             // Resume running if we were in run mode
             if (wasRunningBeforeInput) {
@@ -346,6 +358,22 @@ function enableControls(enabled) {
 function clearOutput() {
     const el = document.getElementById('output-area');
     if (el) el.innerHTML = '';
+    lastOutputLen = 0;
+}
+
+function displayNewOutput(text) {
+    const el = document.getElementById('output-area');
+    if (!el || !text) return;
+    // Split by newlines to create separate output lines
+    const parts = text.split('\n');
+    for (const part of parts) {
+        if (part === '') continue;
+        const line = document.createElement('div');
+        line.className = 'output-line';
+        line.textContent = part;
+        el.appendChild(line);
+    }
+    el.scrollTop = el.scrollHeight;
 }
 
 function appendOutput(text) {
