@@ -9,7 +9,7 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="/"><span class="nav-logo">⚡</span><span class="nav-title">BMC</span></a>
+            <a href="/"><span class="nav-title">BMC</span></a>
         </div>
         <div class="nav-links">
             <a href="/" class="nav-link">Home</a>
@@ -157,13 +157,23 @@
 
     <!-- Save Dialog -->
     <div id="save-dialog" class="modal-overlay" style="display:none;">
-        <div class="form-card" style="max-width:400px;width:90%;">
+        <div class="form-card" style="max-width:420px;width:90%;">
             <h3 style="margin-bottom:1rem;">💾 Save Program</h3>
             <div class="form-group">
                 <label for="save-name">Program Name</label>
-                <input type="text" id="save-name" placeholder="My Program">
+                <input type="text" id="save-name" placeholder="Enter a name or pick from below...">
             </div>
-            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <div class="form-group" id="save-existing-group" style="display:none;">
+                <label>Or overwrite an existing program</label>
+                <div class="custom-dropdown" id="save-existing-dropdown">
+                    <button class="dropdown-toggle" type="button">
+                        <span class="dropdown-text">Select existing program...</span>
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="dropdown-menu" id="save-existing-menu"></div>
+                </div>
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
                 <button class="btn btn-outline btn-sm" id="btn-save-cancel">Cancel</button>
                 <button class="btn btn-primary btn-sm" id="btn-save-confirm">Save</button>
             </div>

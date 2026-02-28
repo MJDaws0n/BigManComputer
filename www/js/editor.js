@@ -121,6 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loadName) {
         loadProgramByName(loadName);
     }
+    const exampleName = params.get('example');
+    if (exampleName && EXAMPLES[exampleName]) {
+        codeInput.value = EXAMPLES[exampleName];
+    }
 
     updateLineNumbers();
 });
@@ -184,6 +188,53 @@ function setupSave() {
     const dialog = document.getElementById('save-dialog');
     const btnConfirm = document.getElementById('btn-save-confirm');
     const btnCancel = document.getElementById('btn-save-cancel');
+    const saveExistingGroup = document.getElementById('save-existing-group');
+    const saveNameInput = document.getElementById('save-name');
+
+    let selectedExisting = '';
+    let userPrograms = [];
+
+    // Listen for existing program dropdown changes — fill the name input
+    const saveExistingDropdown = document.getElementById('save-existing-dropdown');
+    if (saveExistingDropdown) {
+        saveExistingDropdown.addEventListener('dropdown-change', (e) => {
+            selectedExisting = e.detail.value;
+            if (selectedExisting && saveNameInput) {
+                saveNameInput.value = selectedExisting;
+            }
+        });
+    }
+
+    // Clear dropdown selection when user types a new name
+    if (saveNameInput) {
+        saveNameInput.addEventListener('input', () => {
+            selectedExisting = '';
+            const existText = saveExistingDropdown ? saveExistingDropdown.querySelector('.dropdown-text') : null;
+            if (existText) existText.textContent = 'Select existing program...';
+        });
+    }
+
+    async function loadUserPrograms() {
+        try {
+            const res = await fetch('/api/programs/list');
+            const data = await res.json();
+            userPrograms = (data.programs || []);
+            const menu = document.getElementById('save-existing-menu');
+            if (userPrograms.length === 0) {
+                saveExistingGroup.style.display = 'none';
+            } else {
+                saveExistingGroup.style.display = 'block';
+                if (menu) {
+                    menu.innerHTML = userPrograms.map(p =>
+                        '<div class="dropdown-item" data-value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</div>'
+                    ).join('');
+                    initCustomDropdowns();
+                }
+            }
+        } catch(e) {
+            saveExistingGroup.style.display = 'none';
+        }
+    }
 
     if (btnSave) {
         btnSave.addEventListener('click', async () => {
@@ -193,39 +244,59 @@ function setupSave() {
                 window.location.href = '/login';
                 return;
             }
+            selectedExisting = '';
+            if (saveNameInput) saveNameInput.value = '';
+            const existText = saveExistingDropdown ? saveExistingDropdown.querySelector('.dropdown-text') : null;
+            if (existText) existText.textContent = 'Select existing program...';
+
+            await loadUserPrograms();
             if (dialog) dialog.style.display = 'flex';
         });
     }
 
     if (btnConfirm) {
         btnConfirm.addEventListener('click', async () => {
-            const name = document.getElementById('save-name').value.trim();
-            if (!name) { bmcAlert('Please enter a program name.', 'warning'); return; }
+            const name = saveNameInput ? saveNameInput.value.trim() : '';
+            if (!name) {
+                bmcAlert('Please enter a program name or select an existing one.', 'warning');
+                return;
+            }
+
+            // If the name matches an existing program, send with overwrite
+            const isExisting = userPrograms.some(p => p.name === name);
+            const overwrite = isExisting ? "true" : "false";
+
+            // If overwriting and user didn't pick from dropdown, confirm first
+            if (isExisting && selectedExisting !== name) {
+                const ok = await bmcConfirm('A program named "' + name + '" already exists. Overwrite it?');
+                if (!ok) return;
+            }
+
             try {
                 const res = await fetch('/api/programs/save', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ name, code: getCode() })
+                    body: JSON.stringify({ name, code: getCode(), overwrite })
                 });
                 const data = await res.json();
                 if (data.ok) {
                     if (dialog) dialog.style.display = 'none';
                     bmcAlert('Program saved!', 'success');
-                } else if (data.error === 'Program already exists') {
-                    const overwrite = await bmcConfirm('A program named "' + name + '" already exists. Overwrite it?');
-                    if (overwrite) {
-                        const res2 = await fetch('/api/programs/save', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ name, code: getCode(), overwrite: "true" })
-                        });
-                        const data2 = await res2.json();
-                        if (data2.ok) {
-                            if (dialog) dialog.style.display = 'none';
-                            bmcAlert('Program saved!', 'success');
-                        } else {
-                            bmcAlert(data2.error || 'Failed to save', 'error');
-                        }
+                } else {
+                    bmcAlert(data.error || 'Failed to save', 'error');
+                }
+            } catch(e) {
+                bmcAlert('Failed to save program', 'error');
+            }
+        });
+    }
+
+    if (btnCancel) {
+        btnCancel.addEventListener('click', () => {
+            if (dialog) dialog.style.display = 'none';
+        });
+    }
+}
                     }
                 } else {
                     bmcAlert(data.error || 'Failed to save', 'error');
