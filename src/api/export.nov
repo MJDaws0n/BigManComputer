@@ -1,0 +1,121 @@
+// ---------------------------------------------------------------------------
+// api/export - Export BMC programs as compiled executables
+// Compiles BMC code to Novus source, then to a native binary
+// Uses fork() to avoid blocking the server during compilation
+// ---------------------------------------------------------------------------
+
+module api_export;
+
+import ../../lib/std/main;
+import ../../lib/http/main;
+import ../../lib/file_io/main;
+import ../../lib/process/main;
+import ../../lib/time/main;
+
+import ../bmc/compiler;
+import ../api/auth;
+
+// ---------------------------------------------------------------------------
+// POST /api/export - Compile and download a BMC program
+// Body: {"code":"...","name":"my_program"}
+// ---------------------------------------------------------------------------
+
+fn handle_export(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let code: str = json_get_value(body, "code");
+    let name: str = json_get_value(body, "name");
+
+    if (len(code) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No code provided\"}");
+        return;
+    }
+
+    if (len(name) == 0) { name = "bmc_program"; }
+
+    // Sanitise name
+    let safe_name: str = "";
+    let ni: i32 = 0;
+    while (ni < len(name)) {
+        let ch: i32 = name[ni] & 255;
+        if (is_alnum(ch) || ch == 95 || ch == 45) {
+            safe_name = safe_name + name[ni];
+        }
+        ni = ni + 1;
+    }
+    if (len(safe_name) == 0) { safe_name = "bmc_program"; }
+
+    // Generate Novus source
+    let novus_src: str = bmc_to_novus(code);
+    if (starts_with(novus_src, "// Compilation error")) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"" + json_escape(novus_src) + "\"}");
+        return;
+    }
+
+    // Write to temp file
+    let timestamp: str = i64_to_str(get_time_us());
+    let tmp_dir: str = "data/exports";
+    sys_mkdir(tmp_dir, 493);
+    let src_path: str = tmp_dir + "/" + safe_name + "_" + timestamp + ".nov";
+    write_file(src_path, novus_src);
+
+    // Compile using novus compiler (fork to avoid blocking)
+    let compile_cmd: str = "novus " + src_path + " 2>&1";
+    let result: str = shell_output(compile_cmd, 8192);
+
+    // Check if binary was produced
+    let bin_path: str = "build/darwin_arm64/" + safe_name + "_" + timestamp;
+    if (!file_exists(bin_path)) {
+        // Try without the module name prefix
+        bin_path = "build/darwin_arm64/bmc_export";
+        if (!file_exists(bin_path)) {
+            api_send_json(client_fd, 500, "{\"ok\":false,\"error\":\"Compilation failed: " + json_escape(result) + "\"}");
+            // Clean up
+            file_delete(src_path);
+            return;
+        }
+    }
+
+    // Read the binary and send it
+    let binary: str = read_file(bin_path);
+    let bin_len: i32 = len(binary);
+
+    if (bin_len <= 0) {
+        api_send_json(client_fd, 500, "{\"ok\":false,\"error\":\"Failed to read compiled binary\"}");
+        file_delete(src_path);
+        file_delete(bin_path);
+        return;
+    }
+
+    // Send binary as download
+    let response: str = "HTTP/1.1 200 OK\r\n";
+    response = response + "Content-Type: application/octet-stream\r\n";
+    response = response + "Content-Disposition: attachment; filename=\"" + safe_name + "\"\r\n";
+    response = response + "Content-Length: " + i32_to_str(bin_len) + "\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    net_write_str(client_fd, response);
+    net_write(client_fd, binary, bin_len);
+
+    // Clean up temp files
+    file_delete(src_path);
+    file_delete(bin_path);
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/export/source - Get the Novus source without compiling
+// Body: {"code":"..."}
+// ---------------------------------------------------------------------------
+
+fn handle_export_source(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let code: str = json_get_value(body, "code");
+
+    if (len(code) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No code provided\"}");
+        return;
+    }
+
+    let novus_src: str = bmc_to_novus(code);
+    let json: str = "{\"ok\":true,\"source\":\"" + json_escape(novus_src) + "\"}";
+    api_send_json(client_fd, 200, json);
+}

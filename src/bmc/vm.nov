@@ -1,0 +1,490 @@
+// ---------------------------------------------------------------------------
+// bmc/vm - Big Man Computer Virtual Machine
+//
+// Simulates a simple CPU with:
+//   ACC (Accumulator), PC (Program Counter), MAR, MDR, CIR, SR (Status)
+//   100 memory locations (0-99)
+//
+// The VM state is encoded as a string for easy transport via HTTP.
+// ---------------------------------------------------------------------------
+
+module bmc_vm;
+
+import ../../lib/std/main;
+import parser;
+import ../db;
+
+// ---------------------------------------------------------------------------
+// VM State encoding/decoding
+//
+// State string format (pipe-separated):
+//   acc|pc|mar|mdr|cir|sr|halted|mem0,mem1,...,mem99|inst_count|op0,op1,...|operand0,operand1,...|output|input_buf|error
+//
+// SR flags: 0=none, 1=zero, 2=positive, 3=negative
+// ---------------------------------------------------------------------------
+
+fn vm_create(parsed: str) -> str {
+    // parsed format: "OK|inst_count|opcodes|operands"
+    let status: str = str_split_first(parsed, "|");
+    let rest: str = str_split_rest(parsed, "|");
+
+    if (status != "OK") {
+        return "ERR|" + rest;
+    }
+
+    let count_str: str = str_split_first(rest, "|");
+    rest = str_split_rest(rest, "|");
+    let opcodes_str: str = str_split_first(rest, "|");
+    let operands_str: str = str_split_rest(rest, "|");
+
+    let inst_count: i32 = str_to_i32(count_str);
+
+    // Build memory string - initialize with program data
+    // Parse operands to init memory with DAT values
+    let mem: str = "";
+    let mi: i32 = 0;
+    while (mi < 100) {
+        if (mi > 0) { mem = mem + ","; }
+        mem = mem + "0";
+        mi = mi + 1;
+    }
+
+    // Load DAT values into memory
+    // Parse opcodes and operands to find DAT instructions
+    let op_parts: str = opcodes_str;
+    let oper_parts: str = operands_str;
+    let idx: i32 = 0;
+    let op_remaining: str = op_parts;
+    let oper_remaining: str = oper_parts;
+
+    // We need to load DAT values into memory
+    // Rebuild memory with program data loaded
+    let mem_vals: []i32 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+    // Parse DAT values
+    let opc_copy: str = opcodes_str;
+    let opr_copy: str = operands_str;
+    let parse_idx: i32 = 0;
+    while (parse_idx < inst_count && parse_idx < 100) {
+        let cur_op_str: str = str_split_first(opc_copy, ",");
+        let cur_oper_str: str = str_split_first(opr_copy, ",");
+        let cur_op: i32 = str_to_i32(cur_op_str);
+        let cur_oper: i32 = str_to_i32(cur_oper_str);
+
+        if (cur_op == OP_DAT()) {
+            mem_vals[parse_idx] = cur_oper;
+        }
+
+        if (str_contains(opc_copy, ",")) {
+            opc_copy = str_split_rest(opc_copy, ",");
+            opr_copy = str_split_rest(opr_copy, ",");
+        }
+        parse_idx = parse_idx + 1;
+    }
+
+    // Rebuild memory string
+    mem = "";
+    mi = 0;
+    while (mi < 100) {
+        if (mi > 0) { mem = mem + ","; }
+        mem = mem + i32_to_str(mem_vals[mi]);
+        mi = mi + 1;
+    }
+
+    // acc|pc|mar|mdr|cir|sr|halted|memory|inst_count|opcodes|operands|output|input_buf|error
+    let state: str = "0|0|0|0|0|0|0|" + mem + "|" + count_str + "|" + opcodes_str + "|" + operands_str + "|||";
+    return state;
+}
+
+// ---------------------------------------------------------------------------
+// Get a field from the VM state
+// ---------------------------------------------------------------------------
+
+fn vm_get_field(state: str, index: i32) -> str {
+    return db_get_field(state, index);
+}
+
+fn vm_get_acc(state: str) -> i32 { return str_to_i32(vm_get_field(state, 0)); }
+fn vm_get_pc(state: str) -> i32 { return str_to_i32(vm_get_field(state, 1)); }
+fn vm_get_mar(state: str) -> i32 { return str_to_i32(vm_get_field(state, 2)); }
+fn vm_get_mdr(state: str) -> i32 { return str_to_i32(vm_get_field(state, 3)); }
+fn vm_get_cir(state: str) -> i32 { return str_to_i32(vm_get_field(state, 4)); }
+fn vm_get_sr(state: str) -> i32 { return str_to_i32(vm_get_field(state, 5)); }
+fn vm_is_halted(state: str) -> bool { return vm_get_field(state, 6) == "1"; }
+fn vm_get_memory_str(state: str) -> str { return vm_get_field(state, 7); }
+fn vm_get_inst_count(state: str) -> i32 { return str_to_i32(vm_get_field(state, 8)); }
+fn vm_get_opcodes(state: str) -> str { return vm_get_field(state, 9); }
+fn vm_get_operands(state: str) -> str { return vm_get_field(state, 10); }
+fn vm_get_output(state: str) -> str { return vm_get_field(state, 11); }
+fn vm_get_input(state: str) -> str { return vm_get_field(state, 12); }
+fn vm_get_error(state: str) -> str { return vm_get_field(state, 13); }
+
+// ---------------------------------------------------------------------------
+// Set a field in the VM state
+// ---------------------------------------------------------------------------
+
+fn vm_set_field(state: str, index: i32, value: str) -> str {
+    return db_set_field(state, index, value);
+}
+
+// ---------------------------------------------------------------------------
+// Get memory value at address
+// ---------------------------------------------------------------------------
+
+fn vm_mem_get(mem_str: str, addr: i32) -> i32 {
+    let idx: i32 = 0;
+    let pos: i32 = 0;
+    let mlen: i32 = len(mem_str);
+    while (idx < addr && pos < mlen) {
+        if (mem_str[pos] == ',') { idx = idx + 1; }
+        pos = pos + 1;
+    }
+    let start: i32 = pos;
+    while (pos < mlen && mem_str[pos] != ',') {
+        pos = pos + 1;
+    }
+    return str_to_i32(substr_len(mem_str, start, pos - start));
+}
+
+// ---------------------------------------------------------------------------
+// Set memory value at address
+// ---------------------------------------------------------------------------
+
+fn vm_mem_set(mem_str: str, addr: i32, value: i32) -> str {
+    let result: str = "";
+    let idx: i32 = 0;
+    let pos: i32 = 0;
+    let mlen: i32 = len(mem_str);
+    while (pos <= mlen) {
+        let is_end: bool = (pos == mlen);
+        if (is_end || mem_str[pos] == ',') {
+            if (idx == addr) {
+                result = result + i32_to_str(value);
+            } else {
+                let start_pos: i32 = pos;
+                // Find start of this segment
+                let seg_start: i32 = 0;
+                if (idx > 0) {
+                    let cnt: i32 = 0;
+                    let si: i32 = 0;
+                    while (si < mlen && cnt < idx) {
+                        if (mem_str[si] == ',') { cnt = cnt + 1; }
+                        si = si + 1;
+                    }
+                    seg_start = si;
+                }
+                let seg: str = "";
+                let sj: i32 = seg_start;
+                while (sj < mlen && mem_str[sj] != ',') {
+                    seg = seg + mem_str[sj];
+                    sj = sj + 1;
+                }
+                result = result + seg;
+            }
+            if (!is_end) { result = result + ","; }
+            idx = idx + 1;
+        }
+        pos = pos + 1;
+    }
+    // Remove trailing comma if any
+    if (len(result) > 0 && result[len(result) - 1] == ',') {
+        result = substr_len(result, 0, len(result) - 1);
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Get opcode at instruction index
+// ---------------------------------------------------------------------------
+
+fn vm_get_opcode_at(opcodes_str: str, index: i32) -> i32 {
+    let idx: i32 = 0;
+    let pos: i32 = 0;
+    let slen: i32 = len(opcodes_str);
+    while (idx < index && pos < slen) {
+        if (opcodes_str[pos] == ',') { idx = idx + 1; }
+        pos = pos + 1;
+    }
+    let start: i32 = pos;
+    while (pos < slen && opcodes_str[pos] != ',') {
+        pos = pos + 1;
+    }
+    return str_to_i32(substr_len(opcodes_str, start, pos - start));
+}
+
+fn vm_get_operand_at(operands_str: str, index: i32) -> i32 {
+    return vm_get_opcode_at(operands_str, index);
+}
+
+// ---------------------------------------------------------------------------
+// Update status register based on accumulator value
+// ---------------------------------------------------------------------------
+
+fn calc_sr(acc: i32) -> i32 {
+    if (acc == 0) { return 1; }
+    if (acc > 0) { return 2; }
+    return 3;
+}
+
+fn sr_to_str(sr: i32) -> str {
+    if (sr == 1) { return "Z"; }
+    if (sr == 2) { return "P"; }
+    if (sr == 3) { return "N"; }
+    return "-";
+}
+
+// ---------------------------------------------------------------------------
+// Execute one instruction (step)
+// Returns updated state string
+// ---------------------------------------------------------------------------
+
+fn vm_step(state: str) -> str {
+    if (vm_is_halted(state)) { return state; }
+
+    let acc: i32 = vm_get_acc(state);
+    let pc: i32 = vm_get_pc(state);
+    let mem_str: str = vm_get_memory_str(state);
+    let inst_count: i32 = vm_get_inst_count(state);
+    let opcodes_str: str = vm_get_opcodes(state);
+    let operands_str: str = vm_get_operands(state);
+    let output: str = vm_get_output(state);
+    let input_buf: str = vm_get_input(state);
+    let error: str = "";
+
+    if (pc >= inst_count) {
+        // Past end of program - halt
+        state = vm_set_field(state, 6, "1");
+        return state;
+    }
+
+    // Fetch
+    let opcode: i32 = vm_get_opcode_at(opcodes_str, pc);
+    let operand: i32 = vm_get_operand_at(operands_str, pc);
+    let mar: i32 = operand;
+    let mdr: i32 = 0;
+    let cir: i32 = opcode;
+    let new_pc: i32 = pc + 1;
+    let halted: i32 = 0;
+
+    // Decode & Execute
+    if (opcode == OP_LDA()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        acc = mdr;
+    } else if (opcode == OP_STA()) {
+        mar = operand;
+        mdr = acc;
+        mem_str = vm_mem_set(mem_str, mar, acc);
+    } else if (opcode == OP_ADD()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        acc = acc + mdr;
+    } else if (opcode == OP_SUB()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        acc = acc - mdr;
+    } else if (opcode == OP_MUL()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        acc = acc * mdr;
+    } else if (opcode == OP_DIV()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        if (mdr == 0) {
+            error = "Division by zero";
+            halted = 1;
+        } else {
+            acc = acc / mdr;
+        }
+    } else if (opcode == OP_MOD()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        if (mdr == 0) {
+            error = "Modulo by zero";
+            halted = 1;
+        } else {
+            acc = acc % mdr;
+        }
+    } else if (opcode == OP_INP()) {
+        // Take first value from input buffer
+        if (len(input_buf) == 0) {
+            error = "WAITING_INPUT";
+            // Don't advance PC - we'll retry after input is provided
+            new_pc = pc;
+        } else {
+            let val_str: str = str_split_first(input_buf, ",");
+            let remaining: str = str_split_rest(input_buf, ",");
+            acc = str_to_i32(val_str);
+            input_buf = remaining;
+        }
+    } else if (opcode == OP_OUT()) {
+        if (len(output) > 0) { output = output + "\n"; }
+        output = output + i32_to_str(acc);
+    } else if (opcode == OP_OTC()) {
+        let ch: str = " ";
+        ch[0] = acc % 256;
+        output = output + ch;
+    } else if (opcode == OP_HLT()) {
+        halted = 1;
+    } else if (opcode == OP_BRA()) {
+        new_pc = operand;
+    } else if (opcode == OP_BRZ()) {
+        if (acc == 0) { new_pc = operand; }
+    } else if (opcode == OP_BRP()) {
+        if (acc >= 0) { new_pc = operand; }
+    } else if (opcode == OP_AND()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        // Simulate bitwise AND via arithmetic
+        acc = bmc_bitwise_and(acc, mdr);
+    } else if (opcode == OP_OR()) {
+        mar = operand;
+        mdr = vm_mem_get(mem_str, mar);
+        acc = bmc_bitwise_or(acc, mdr);
+    } else if (opcode == OP_NOT()) {
+        acc = 999 - acc;
+    } else if (opcode == OP_DAT()) {
+        // DAT is data, not an instruction - skip
+        // If execution reaches a DAT, just move past it
+    } else {
+        error = "Unknown opcode: " + i32_to_str(opcode);
+        halted = 1;
+    }
+
+    let sr: i32 = calc_sr(acc);
+
+    // Rebuild state
+    let new_state: str = i32_to_str(acc) + "|" +
+                          i32_to_str(new_pc) + "|" +
+                          i32_to_str(mar) + "|" +
+                          i32_to_str(mdr) + "|" +
+                          i32_to_str(cir) + "|" +
+                          i32_to_str(sr) + "|" +
+                          i32_to_str(halted) + "|" +
+                          mem_str + "|" +
+                          i32_to_str(inst_count) + "|" +
+                          opcodes_str + "|" +
+                          operands_str + "|" +
+                          output + "|" +
+                          input_buf + "|" +
+                          error;
+    return new_state;
+}
+
+// ---------------------------------------------------------------------------
+// Bitwise operations via arithmetic (Novus has no bitwise ops natively
+// on all platforms, so we simulate them)
+// ---------------------------------------------------------------------------
+
+fn bmc_bitwise_and(a: i32, b: i32) -> i32 {
+    let result: i32 = 0;
+    let bit: i32 = 1;
+    let i: i32 = 0;
+    while (i < 16) {
+        let bit_a: i32 = (a / bit) % 2;
+        let bit_b: i32 = (b / bit) % 2;
+        if (bit_a == 1 && bit_b == 1) {
+            result = result + bit;
+        }
+        bit = bit * 2;
+        i = i + 1;
+    }
+    return result;
+}
+
+fn bmc_bitwise_or(a: i32, b: i32) -> i32 {
+    let result: i32 = 0;
+    let bit: i32 = 1;
+    let i: i32 = 0;
+    while (i < 16) {
+        let bit_a: i32 = (a / bit) % 2;
+        let bit_b: i32 = (b / bit) % 2;
+        if (bit_a == 1 || bit_b == 1) {
+            result = result + bit;
+        }
+        bit = bit * 2;
+        i = i + 1;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Run program to completion (max steps to prevent infinite loops)
+// ---------------------------------------------------------------------------
+
+fn vm_run(state: str, max_steps: i32) -> str {
+    let steps: i32 = 0;
+    while (!vm_is_halted(state) && steps < max_steps) {
+        let error: str = vm_get_error(state);
+        if (error == "WAITING_INPUT") {
+            break;
+        }
+        if (len(error) > 0) {
+            break;
+        }
+        state = vm_step(state);
+        steps = steps + 1;
+    }
+    return state;
+}
+
+// ---------------------------------------------------------------------------
+// Provide input to the VM (append to input buffer)
+// ---------------------------------------------------------------------------
+
+fn vm_provide_input(state: str, value: str) -> str {
+    let current_input: str = vm_get_input(state);
+    if (len(current_input) > 0) {
+        current_input = current_input + "," + value;
+    } else {
+        current_input = value;
+    }
+    // Set input and clear WAITING_INPUT error
+    state = vm_set_field(state, 12, current_input);
+    let error: str = vm_get_error(state);
+    if (error == "WAITING_INPUT") {
+        state = vm_set_field(state, 13, "");
+    }
+    return state;
+}
+
+// ---------------------------------------------------------------------------
+// Convert VM state to JSON for the frontend
+// ---------------------------------------------------------------------------
+
+fn vm_state_to_json(state: str) -> str {
+    let acc: i32 = vm_get_acc(state);
+    let pc: i32 = vm_get_pc(state);
+    let mar: i32 = vm_get_mar(state);
+    let mdr: i32 = vm_get_mdr(state);
+    let cir: i32 = vm_get_cir(state);
+    let sr: i32 = vm_get_sr(state);
+    let halted: bool = vm_is_halted(state);
+    let output: str = vm_get_output(state);
+    let error: str = vm_get_error(state);
+    let mem_str: str = vm_get_memory_str(state);
+    let inst_count: i32 = vm_get_inst_count(state);
+
+    let json: str = "{";
+    json = json + "\"acc\":" + i32_to_str(acc) + ",";
+    json = json + "\"pc\":" + i32_to_str(pc) + ",";
+    json = json + "\"mar\":" + i32_to_str(mar) + ",";
+    json = json + "\"mdr\":" + i32_to_str(mdr) + ",";
+    json = json + "\"cir\":\"" + opcode_name(cir) + "\",";
+    json = json + "\"cirNum\":" + i32_to_str(cir) + ",";
+    json = json + "\"sr\":\"" + sr_to_str(sr) + "\",";
+    let halted_str: str = "false";
+    if (halted) { halted_str = "true"; }
+    json = json + "\"halted\":" + halted_str + ",";
+    json = json + "\"output\":\"" + json_escape(output) + "\",";
+    json = json + "\"error\":\"" + json_escape(error) + "\",";
+    json = json + "\"instCount\":" + i32_to_str(inst_count) + ",";
+    json = json + "\"memory\":[" + mem_str + "]";
+    json = json + "}";
+
+    return json;
+}

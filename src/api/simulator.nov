@@ -1,0 +1,204 @@
+// ---------------------------------------------------------------------------
+// api/simulator - BMC Simulator API endpoints
+// Handles loading, stepping, running, resetting, and providing input
+// ---------------------------------------------------------------------------
+
+module api_simulator;
+
+import ../../lib/std/main;
+import ../../lib/http/main;
+import ../../lib/file_io/main;
+import ../../lib/time/main;
+
+import ../bmc/parser;
+import ../bmc/vm;
+import ../api/auth;
+
+// ---------------------------------------------------------------------------
+// Active VM sessions - stored in files to avoid global variable issues
+// State files: data/sim_<key>.state
+// ---------------------------------------------------------------------------
+
+fn sim_state_path(key: str) -> str {
+    return "data/sim_" + key + ".state";
+}
+
+// ---------------------------------------------------------------------------
+// Get or create a session key from the request
+// ---------------------------------------------------------------------------
+
+fn get_sim_key(request: str) -> str {
+    let body: str = api_get_body(request);
+    let sid: str = json_get_value(body, "session_id");
+    if (len(sid) > 0) { return sid; }
+
+    let token: str = get_session_cookie(request);
+    if (len(token) == 0) {
+        return "anon_" + i64_to_str(get_time_us());
+    }
+    return token;
+}
+
+// ---------------------------------------------------------------------------
+// Store a VM state for a session
+// ---------------------------------------------------------------------------
+
+fn store_sim(key: str, state: str) -> void {
+    write_file(sim_state_path(key), state);
+}
+
+// ---------------------------------------------------------------------------
+// Load a VM state for a session, returns "" if not found
+// ---------------------------------------------------------------------------
+
+fn load_sim(key: str) -> str {
+    let path: str = sim_state_path(key);
+    if (!file_exists(path)) { return ""; }
+    return read_file(path);
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/load - Load and parse a BMC program
+// Body: {"code":"..."}
+// ---------------------------------------------------------------------------
+
+fn handle_load(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let code: str = json_get_value(body, "code");
+
+    if (len(code) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No code provided\"}");
+        return;
+    }
+
+    let parsed: str = bmc_parse(code);
+    let status: str = str_split_first(parsed, "|");
+
+    if (status != "OK") {
+        let err_msg: str = str_split_rest(parsed, "|");
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"" + json_escape(err_msg) + "\"}");
+        return;
+    }
+
+    let state: str = vm_create(parsed);
+    if (starts_with(state, "ERR")) {
+        let err_msg: str = str_split_rest(state, "|");
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"" + json_escape(err_msg) + "\"}");
+        return;
+    }
+
+    let key: str = get_sim_key(request);
+    store_sim(key, state);
+
+    let state_json: str = vm_state_to_json(state);
+    let inst_count: i32 = vm_get_inst_count(state);
+    let json: str = "{\"ok\":true,\"session_id\":\"" + json_escape(key) + "\",\"instruction_count\":" + i32_to_str(inst_count) + ",\"state\":" + state_json + "}";
+    api_send_json(client_fd, 200, json);
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/step - Execute one instruction
+// ---------------------------------------------------------------------------
+
+fn handle_step(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let key: str = json_get_value(body, "session_id");
+    if (len(key) == 0) { key = get_sim_key(request); }
+
+    let state: str = load_sim(key);
+    if (len(state) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No program loaded\"}");
+        return;
+    }
+
+    state = vm_step(state);
+    store_sim(key, state);
+
+    let state_json: str = vm_state_to_json(state);
+    let halted: bool = vm_is_halted(state);
+    let error: str = vm_get_error(state);
+    let output: str = vm_get_output(state);
+    let waiting: bool = (error == "WAITING_INPUT");
+    let halted_str: str = "false";
+    if (halted) { halted_str = "true"; }
+    let waiting_str: str = "false";
+    if (waiting) { waiting_str = "true"; }
+
+    let json: str = "{\"ok\":true,\"halted\":" + halted_str + ",\"waiting_input\":" + waiting_str + ",\"output\":\"" + json_escape(output) + "\",\"state\":" + state_json + "}";
+    api_send_json(client_fd, 200, json);
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/run - Run program to completion (max 10000 steps)
+// ---------------------------------------------------------------------------
+
+fn handle_run(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let key: str = json_get_value(body, "session_id");
+    if (len(key) == 0) { key = get_sim_key(request); }
+
+    let state: str = load_sim(key);
+    if (len(state) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No program loaded\"}");
+        return;
+    }
+
+    state = vm_run(state, 1000);
+    store_sim(key, state);
+
+    let state_json: str = vm_state_to_json(state);
+    let halted: bool = vm_is_halted(state);
+    let error: str = vm_get_error(state);
+    let output: str = vm_get_output(state);
+    let waiting: bool = (error == "WAITING_INPUT");
+    let halted_str: str = "false";
+    if (halted) { halted_str = "true"; }
+    let waiting_str: str = "false";
+    if (waiting) { waiting_str = "true"; }
+
+    let json: str = "{\"ok\":true,\"halted\":" + halted_str + ",\"waiting_input\":" + waiting_str + ",\"output\":\"" + json_escape(output) + "\",\"state\":" + state_json + "}";
+    api_send_json(client_fd, 200, json);
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/reset - Reset the VM
+// ---------------------------------------------------------------------------
+
+fn handle_reset(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let key: str = json_get_value(body, "session_id");
+    if (len(key) == 0) { key = get_sim_key(request); }
+
+    let path: str = sim_state_path(key);
+    if (file_exists(path)) {
+        file_delete(path);
+    }
+
+    api_send_json(client_fd, 200, "{\"ok\":true}");
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/input - Provide input to a waiting VM
+// Body: {"session_id":"...","value":"42"}
+// ---------------------------------------------------------------------------
+
+fn handle_input(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let value: str = json_get_value(body, "value");
+    let key: str = json_get_value(body, "session_id");
+    if (len(key) == 0) { key = get_sim_key(request); }
+
+    let state: str = load_sim(key);
+    if (len(state) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"No program loaded\"}");
+        return;
+    }
+
+    state = vm_provide_input(state, value);
+    state = vm_step(state);
+    store_sim(key, state);
+
+    let state_json: str = vm_state_to_json(state);
+    let json: str = "{\"ok\":true,\"state\":" + state_json + "}";
+    api_send_json(client_fd, 200, json);
+}

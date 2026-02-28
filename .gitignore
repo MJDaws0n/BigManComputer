@@ -1,0 +1,23 @@
+# Build output
+build/
+
+# Database files
+data/
+
+# Simulator state files
+data/sim_*
+
+# Nox packages (pulled from registry)
+lib/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Cookies/temp from testing
+/tmp/bmc_*

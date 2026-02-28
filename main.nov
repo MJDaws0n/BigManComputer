@@ -1,0 +1,262 @@
+// ---------------------------------------------------------------------------
+// Big Man Computer (BMC) - Main Entry Point
+//
+// An LMC-inspired CPU simulator with a web-based IDE and visualizer.
+// Built in Novus, the language it teaches about.
+//
+// Usage: ./bmc [--port PORT] [--debug]
+// Default port: 8080
+// ---------------------------------------------------------------------------
+
+module BigManComputer;
+
+import lib/std/main;
+import lib/net/main;
+import lib/http/main;
+import lib/file_io/main;
+import lib/process/main;
+import lib/env/main;
+import lib/time/main;
+
+import src/db;
+import src/hash;
+import src/bmc/parser;
+import src/bmc/vm;
+import src/bmc/compiler;
+import src/api/auth;
+import src/api/simulator;
+import src/api/programs;
+import src/api/export;
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+fn get_bmc_version() -> str {
+    return "1.0.0";
+}
+
+// ---------------------------------------------------------------------------
+// Parse command line arguments
+// ---------------------------------------------------------------------------
+
+fn parse_port(argc: i32, argv: u64) -> i32 {
+    let port: i32 = 8080;
+    let i: i32 = 1;
+    while (i < argc) {
+        let arg: str = argv_get(argv, i);
+        if (arg == "--port" && i + 1 < argc) {
+            port = str_to_i32(argv_get(argv, i + 1));
+            i = i + 2;
+        } else if (starts_with(arg, "--port=")) {
+            port = str_to_i32(substr(arg, 7));
+            i = i + 1;
+        } else {
+            i = i + 1;
+        }
+    }
+    return port;
+}
+
+fn parse_debug(argc: i32, argv: u64) -> bool {
+    let i: i32 = 1;
+    while (i < argc) {
+        let arg: str = argv_get(argv, i);
+        if (arg == "--debug") { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Serve static files from www/ directory
+// ---------------------------------------------------------------------------
+
+fn serve_static_file(client_fd: i32, path: str) -> bool {
+    let file_path: str = "www" + path;
+
+    if (path == "/" || path == "") {
+        file_path = "www/index.html";
+    }
+
+    let qpos: i32 = str_find(file_path, "?");
+    if (qpos >= 0) {
+        file_path = substr_len(file_path, 0, qpos);
+    }
+
+    if (!file_exists(file_path)) {
+        return false;
+    }
+
+    let content: str = read_file(file_path);
+    if (len(content) == 0) {
+        return false;
+    }
+
+    let content_type: str = http_content_type(file_path);
+
+    let response: str = "HTTP/1.1 200 OK\r\n";
+    response = response + "Content-Type: " + content_type + "\r\n";
+    response = response + "Content-Length: " + i32_to_str(len(content)) + "\r\n";
+    response = response + "Cache-Control: public, max-age=300\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    net_write_str(client_fd, response);
+    net_write(client_fd, content, len(content));
+
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Send 404 response
+// ---------------------------------------------------------------------------
+
+fn send_404(client_fd: i32) -> void {
+    let body: str = "<html><head><title>404 - BMC</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e0;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{text-align:center}h1{font-size:6rem;color:#6c63ff;margin:0}p{font-size:1.2rem;color:#888}a{color:#6c63ff;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><div><h1>404</h1><p>Page not found</p><p><a href=\"/\">Go to Big Man Computer</a></p></div></body></html>";
+    let response: str = "HTTP/1.1 404 Not Found\r\n";
+    response = response + "Content-Type: text/html\r\n";
+    response = response + "Content-Length: " + i32_to_str(len(body)) + "\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    response = response + body;
+    net_write_str(client_fd, response);
+}
+
+// ---------------------------------------------------------------------------
+// Handle CORS preflight
+// ---------------------------------------------------------------------------
+
+fn handle_cors(client_fd: i32) -> void {
+    let response: str = "HTTP/1.1 204 No Content\r\n";
+    response = response + "Access-Control-Allow-Origin: *\r\n";
+    response = response + "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n";
+    response = response + "Access-Control-Allow-Headers: Content-Type\r\n";
+    response = response + "Access-Control-Max-Age: 86400\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    net_write_str(client_fd, response);
+}
+
+// ---------------------------------------------------------------------------
+// Route an incoming request
+// ---------------------------------------------------------------------------
+
+fn handle_request(client_fd: i32, request: str, debug: bool) -> void {
+    let method: str = http_get_method(request);
+    let full_path: str = http_get_path(request);
+    let path: str = http_get_path_only(full_path);
+
+    if (debug) {
+        print("[BMC] " + method + " " + path);
+    }
+
+    if (method == "OPTIONS") {
+        handle_cors(client_fd);
+        return;
+    }
+
+    // API routes
+    if (method == "POST" && path == "/api/signup") { handle_signup(request, client_fd); return; }
+    if (method == "POST" && path == "/api/login") { handle_login(request, client_fd); return; }
+    if (method == "POST" && path == "/api/logout") { handle_logout(request, client_fd); return; }
+    if (method == "GET" && path == "/api/me") { handle_me(request, client_fd); return; }
+    if (method == "POST" && path == "/api/consent") { handle_consent(request, client_fd); return; }
+    if (method == "DELETE" && path == "/api/account") { handle_delete_account(request, client_fd); return; }
+    if (method == "GET" && path == "/api/export-data") { handle_export_data(request, client_fd); return; }
+
+    // Simulator API
+    if (method == "POST" && path == "/api/load") { handle_load(request, client_fd); return; }
+    if (method == "POST" && path == "/api/step") { handle_step(request, client_fd); return; }
+    if (method == "POST" && path == "/api/run") { handle_run(request, client_fd); return; }
+    if (method == "POST" && path == "/api/reset") { handle_reset(request, client_fd); return; }
+    if (method == "POST" && path == "/api/input") { handle_input(request, client_fd); return; }
+
+    // Program CRUD
+    if (method == "POST" && path == "/api/programs/save") { handle_save_program(request, client_fd); return; }
+    if (method == "GET" && path == "/api/programs/list") { handle_list_programs(request, client_fd); return; }
+    if (method == "GET" && starts_with(path, "/api/programs/load")) { handle_load_program(request, client_fd, full_path); return; }
+    if (method == "POST" && path == "/api/programs/delete") { handle_delete_program(request, client_fd); return; }
+
+    // Export
+    if (method == "POST" && path == "/api/export") { handle_export(request, client_fd); return; }
+    if (method == "POST" && path == "/api/export/source") { handle_export_source(request, client_fd); return; }
+
+    // Clean URL page routes
+    if (path == "/editor") { serve_static_file(client_fd, "/editor.html"); return; }
+    if (path == "/help") { serve_static_file(client_fd, "/help.html"); return; }
+    if (path == "/credits") { serve_static_file(client_fd, "/credits.html"); return; }
+    if (path == "/dashboard") { serve_static_file(client_fd, "/dashboard.html"); return; }
+    if (path == "/login") { serve_static_file(client_fd, "/login.html"); return; }
+    if (path == "/signup") { serve_static_file(client_fd, "/signup.html"); return; }
+    if (path == "/privacy") { serve_static_file(client_fd, "/privacy.html"); return; }
+
+    // Try static file
+    let served: bool = serve_static_file(client_fd, path);
+    if (served) { return; }
+
+    send_404(client_fd);
+}
+
+// ---------------------------------------------------------------------------
+// Print startup banner
+// ---------------------------------------------------------------------------
+
+fn print_banner() -> void {
+    print("");
+    print("  ██████╗ ███╗   ███╗ ██████╗");
+    print("  ██╔══██╗████╗ ████║██╔════╝");
+    print("  ██████╔╝██╔████╔██║██║     ");
+    print("  ██╔══██╗██║╚██╔╝██║██║     ");
+    print("  ██████╔╝██║ ╚═╝ ██║╚██████╗");
+    print("  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝");
+    print("  Big Man Computer v" + get_bmc_version());
+    print("  An LMC-inspired CPU simulator");
+    print("");
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+fn main(argc: i32, argv: u64) -> i32 {
+    net_ignore_sigpipe();
+
+    let port: i32 = parse_port(argc, argv);
+    let debug: bool = parse_debug(argc, argv);
+
+    print_banner();
+
+    db_init();
+    auth_init();
+    programs_init();
+
+    print("[BMC] Starting server on port " + i32_to_str(port) + "...");
+    if (debug) { print("[BMC] Debug mode enabled"); }
+
+    let server_fd: i32 = http_listen(port);
+    if (server_fd < 0) {
+        print("[BMC] ERROR: Failed to start server on port " + i32_to_str(port));
+        exit(1);
+        return 1;
+    }
+
+    print("[BMC] Server running at http://localhost:" + i32_to_str(port));
+    print("[BMC] Press Ctrl+C to stop");
+    print("");
+
+    let running: bool = true;
+    while (running) {
+        let client_fd: i32 = http_accept(server_fd);
+        if (client_fd >= 0) {
+            let request: str = http_read_request(client_fd);
+            if (len(request) > 0) {
+                handle_request(client_fd, request, debug);
+            }
+            net_close(client_fd);
+        }
+    }
+
+    net_close(server_fd);
+    print("[BMC] Server stopped");
+    return 0;
+}

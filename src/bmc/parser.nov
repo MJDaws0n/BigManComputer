@@ -1,0 +1,362 @@
+// ---------------------------------------------------------------------------
+// bmc/parser - Parse BMC (Big Man Computer) assembly source code
+//
+// BMC assembly format:
+//   [label] OPCODE [operand] [; comment]
+//
+// Labels end with colon, e.g. "loop:"
+// Comments start with ;
+// ---------------------------------------------------------------------------
+
+module bmc_parser;
+
+import ../../lib/std/main;
+
+// ---------------------------------------------------------------------------
+// String uppercase helper (not in std library)
+// ---------------------------------------------------------------------------
+
+fn to_upper(s: str) -> str {
+    let result: str = s;
+    let i: i32 = 0;
+    while (i < len(result)) {
+        let c: i32 = result[i] & 255;
+        if (c >= 97 && c <= 122) {
+            result[i] = c - 32;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Opcode constants
+// ---------------------------------------------------------------------------
+
+fn OP_LDA() -> i32 { return 1; }
+fn OP_STA() -> i32 { return 2; }
+fn OP_ADD() -> i32 { return 3; }
+fn OP_SUB() -> i32 { return 4; }
+fn OP_MUL() -> i32 { return 5; }
+fn OP_DIV() -> i32 { return 6; }
+fn OP_MOD() -> i32 { return 7; }
+fn OP_INP() -> i32 { return 8; }
+fn OP_OUT() -> i32 { return 9; }
+fn OP_OTC() -> i32 { return 10; }
+fn OP_HLT() -> i32 { return 11; }
+fn OP_BRA() -> i32 { return 12; }
+fn OP_BRZ() -> i32 { return 13; }
+fn OP_BRP() -> i32 { return 14; }
+fn OP_AND() -> i32 { return 15; }
+fn OP_OR()  -> i32 { return 16; }
+fn OP_NOT() -> i32 { return 17; }
+fn OP_DAT() -> i32 { return 18; }
+
+// ---------------------------------------------------------------------------
+// Instruction storage - flat arrays for up to 100 instructions
+// opcodes[i] = opcode, operands[i] = operand value
+// labels stored separately for resolution
+// ---------------------------------------------------------------------------
+
+// Parse a mnemonic string to opcode number
+fn parse_opcode(mnemonic: str) -> i32 {
+    let m: str = to_upper(mnemonic);
+    if (m == "LDA") { return OP_LDA(); }
+    if (m == "STA") { return OP_STA(); }
+    if (m == "ADD") { return OP_ADD(); }
+    if (m == "SUB") { return OP_SUB(); }
+    if (m == "MUL") { return OP_MUL(); }
+    if (m == "DIV") { return OP_DIV(); }
+    if (m == "MOD") { return OP_MOD(); }
+    if (m == "INP") { return OP_INP(); }
+    if (m == "OUT") { return OP_OUT(); }
+    if (m == "OTC") { return OP_OTC(); }
+    if (m == "HLT") { return OP_HLT(); }
+    if (m == "BRA") { return OP_BRA(); }
+    if (m == "BRZ") { return OP_BRZ(); }
+    if (m == "BRP") { return OP_BRP(); }
+    if (m == "AND") { return OP_AND(); }
+    if (m == "OR")  { return OP_OR(); }
+    if (m == "NOT") { return OP_NOT(); }
+    if (m == "DAT") { return OP_DAT(); }
+    return -1;
+}
+
+// Get opcode name from number
+fn opcode_name(op: i32) -> str {
+    if (op == 1) { return "LDA"; }
+    if (op == 2) { return "STA"; }
+    if (op == 3) { return "ADD"; }
+    if (op == 4) { return "SUB"; }
+    if (op == 5) { return "MUL"; }
+    if (op == 6) { return "DIV"; }
+    if (op == 7) { return "MOD"; }
+    if (op == 8) { return "INP"; }
+    if (op == 9) { return "OUT"; }
+    if (op == 10) { return "OTC"; }
+    if (op == 11) { return "HLT"; }
+    if (op == 12) { return "BRA"; }
+    if (op == 13) { return "BRZ"; }
+    if (op == 14) { return "BRP"; }
+    if (op == 15) { return "AND"; }
+    if (op == 16) { return "OR"; }
+    if (op == 17) { return "NOT"; }
+    if (op == 18) { return "DAT"; }
+    return "???";
+}
+
+// Check if opcode needs an operand
+fn opcode_has_operand(op: i32) -> bool {
+    if (op == OP_INP()) { return false; }
+    if (op == OP_OUT()) { return false; }
+    if (op == OP_OTC()) { return false; }
+    if (op == OP_HLT()) { return false; }
+    if (op == OP_NOT()) { return false; }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Skip whitespace in a string starting from position
+// ---------------------------------------------------------------------------
+
+fn skip_spaces(s: str, pos: i32) -> i32 {
+    while (pos < len(s) && (s[pos] == ' ' || s[pos] == '\t')) {
+        pos = pos + 1;
+    }
+    return pos;
+}
+
+// ---------------------------------------------------------------------------
+// Read a word (non-space token) from string starting at pos
+// Returns the word. Updates pos via return value convention.
+// ---------------------------------------------------------------------------
+
+fn read_word(s: str, pos: i32) -> str {
+    let start: i32 = pos;
+    while (pos < len(s) && s[pos] != ' ' && s[pos] != '\t' && s[pos] != ';' && s[pos] != '\n' && s[pos] != '\r') {
+        pos = pos + 1;
+    }
+    return substr_len(s, start, pos - start);
+}
+
+fn word_end(s: str, pos: i32) -> i32 {
+    while (pos < len(s) && s[pos] != ' ' && s[pos] != '\t' && s[pos] != ';' && s[pos] != '\n' && s[pos] != '\r') {
+        pos = pos + 1;
+    }
+    return pos;
+}
+
+// ---------------------------------------------------------------------------
+// Parse a full BMC program into parallel arrays
+// Returns instruction count
+//
+// Storage format (pipe-separated state string):
+//   Program is encoded as a big string with all data packed together:
+//   - First 100 i32 slots: opcodes (encoded as "op1,op2,...,op100|")
+//   - Next 100 i32 slots: operands
+//   - Next 100 string slots: labels (name for each address)
+//   - inst_count at the end
+//
+// For simplicity, we encode the entire parsed program as a JSON-like string
+// that the VM can decode.
+// ---------------------------------------------------------------------------
+
+fn bmc_parse(source: str) -> str {
+    // Label storage: up to 100 labels, name -> address
+    let label_names: []str = ["", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", "",
+                               "", "", "", "", "", "", "", "", "", ""];
+    let label_addrs: []i32 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let label_count: i32 = 0;
+
+    // Instruction storage
+    let opcodes: []i32 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    // Operand strings (could be label references or numbers)
+    let operand_strs: []str = ["", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", "",
+                                "", "", "", "", "", "", "", "", "", ""];
+    let operands: []i32 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let inst_count: i32 = 0;
+    let error: str = "";
+
+    // Pass 1: Parse lines, collect labels and instructions
+    let line_start: i32 = 0;
+    let si: i32 = 0;
+    let src_len: i32 = len(source);
+
+    while (si <= src_len && inst_count < 100) {
+        let is_end: bool = (si == src_len);
+        if (is_end || source[si] == '\n') {
+            let line: str = substr_len(source, line_start, si - line_start);
+            line_start = si + 1;
+
+            // Strip \r
+            if (len(line) > 0 && line[len(line) - 1] == '\r') {
+                line = substr_len(line, 0, len(line) - 1);
+            }
+
+            // Skip empty lines and comment-only lines
+            let pos: i32 = skip_spaces(line, 0);
+            if (pos < len(line) && line[pos] != ';') {
+                // Read first token
+                let token1: str = read_word(line, pos);
+                pos = word_end(line, pos);
+
+                // Check if it's a label (ends with ':')
+                let label_here: str = "";
+                if (len(token1) > 1 && token1[len(token1) - 1] == ':') {
+                    label_here = substr_len(token1, 0, len(token1) - 1);
+                    if (label_count < 100) {
+                        label_names[label_count] = to_upper(label_here);
+                        label_addrs[label_count] = inst_count;
+                        label_count = label_count + 1;
+                    }
+                    pos = skip_spaces(line, pos);
+                    if (pos >= len(line) || line[pos] == ';') {
+                        // Label-only line, no instruction
+                        si = si + 1;
+                        // continue
+                    } else {
+                        token1 = read_word(line, pos);
+                        pos = word_end(line, pos);
+                    }
+                }
+
+                // token1 should now be the mnemonic
+                if (pos <= len(line) && len(token1) > 0 && line[skip_spaces(line, 0)] != ';') {
+                    // Check it's not just a label-only line we already handled
+                    if (len(label_here) == 0 || pos <= len(line)) {
+                        let op: i32 = parse_opcode(token1);
+                        if (op < 0 && len(label_here) > 0 && (pos >= len(line) || line[pos] == ';')) {
+                            // label-only line, skip
+                        } else if (op < 0) {
+                            error = "Unknown instruction: " + token1;
+                        } else {
+                            opcodes[inst_count] = op;
+                            // Read operand if needed
+                            pos = skip_spaces(line, pos);
+                            if (pos < len(line) && line[pos] != ';') {
+                                let operand_str: str = read_word(line, pos);
+                                operand_strs[inst_count] = operand_str;
+                                // Try to parse as number
+                                let is_num: bool = true;
+                                let ci: i32 = 0;
+                                if (len(operand_str) > 0 && (operand_str[0] == '-' || operand_str[0] == '+')) {
+                                    ci = 1;
+                                }
+                                while (ci < len(operand_str)) {
+                                    if (!is_digit(operand_str[ci] & 255)) {
+                                        is_num = false;
+                                    }
+                                    ci = ci + 1;
+                                }
+                                if (is_num && len(operand_str) > 0) {
+                                    operands[inst_count] = str_to_i32(operand_str);
+                                } else {
+                                    operands[inst_count] = -999;
+                                }
+                            } else {
+                                if (op == OP_DAT()) {
+                                    operands[inst_count] = 0;
+                                }
+                            }
+                            inst_count = inst_count + 1;
+                        }
+                    }
+                }
+            }
+        }
+        si = si + 1;
+    }
+
+    // Pass 2: Resolve label references in operands
+    let ri: i32 = 0;
+    while (ri < inst_count) {
+        if (operands[ri] == -999) {
+            let ref_name: str = to_upper(operand_strs[ri]);
+            let found: bool = false;
+            let li: i32 = 0;
+            while (li < label_count) {
+                if (label_names[li] == ref_name) {
+                    operands[ri] = label_addrs[li];
+                    found = true;
+                }
+                li = li + 1;
+            }
+            if (!found) {
+                error = "Undefined label: " + operand_strs[ri];
+            }
+        }
+        ri = ri + 1;
+    }
+
+    // Encode result as a parseable string
+    // Format: "OK|inst_count|op0,op1,...|operand0,operand1,...|"
+    // Or: "ERR|message|"
+    if (len(error) > 0) {
+        return "ERR|" + error;
+    }
+
+    let result: str = "OK|" + i32_to_str(inst_count) + "|";
+
+    // Encode opcodes
+    let ei: i32 = 0;
+    while (ei < inst_count) {
+        result = result + i32_to_str(opcodes[ei]);
+        if (ei < inst_count - 1) { result = result + ","; }
+        ei = ei + 1;
+    }
+    result = result + "|";
+
+    // Encode operands
+    ei = 0;
+    while (ei < inst_count) {
+        result = result + i32_to_str(operands[ei]);
+        if (ei < inst_count - 1) { result = result + ","; }
+        ei = ei + 1;
+    }
+
+    return result;
+}

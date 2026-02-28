@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help - Big Man Computer</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/"><span class="nav-logo">⚡</span><span class="nav-title">BMC</span></a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/editor" class="nav-link">Editor</a>
+            <a href="/help" class="nav-link active">Help</a>
+            <a href="/credits" class="nav-link">Credits</a>
+            <div class="nav-auth" id="nav-auth">
+                <a href="/login" class="btn btn-outline btn-sm">Log In</a>
+                <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content-page">
+        <h1>BMC <span class="gradient-text">Help</span></h1>
+
+        <h2>What is BMC?</h2>
+        <p>
+            <strong>Big Man Computer</strong> (BMC) is an enhanced version of the Little Man Computer (LMC),
+            a simplified CPU model used to teach the fundamentals of how processors work.
+            BMC extends LMC with additional instructions like multiplication, division, bitwise operations,
+            and character output.
+        </p>
+        <p>
+            Programs are written in a simple assembly-like language and executed step-by-step in a
+            virtual CPU, allowing you to watch registers change, memory update, and data flow through
+            the system in real-time.
+        </p>
+
+        <h2>Assembly Syntax</h2>
+        <p>Each line of a BMC program has the following format:</p>
+        <pre>[label:]  OPCODE  [operand]  [; comment]</pre>
+        <ul>
+            <li><strong>Labels</strong> are optional identifiers followed by a colon, used for branching and data references.</li>
+            <li><strong>Opcodes</strong> are the instruction mnemonics (e.g., <code>LDA</code>, <code>ADD</code>, <code>HLT</code>).</li>
+            <li><strong>Operands</strong> can be memory addresses (0-99) or label names.</li>
+            <li><strong>Comments</strong> start with a semicolon and continue to end of line.</li>
+            <li>Blank lines and comment-only lines are ignored.</li>
+        </ul>
+        <pre>; Example: Add two numbers
+start:  INP          ; Get first number from user
+        STA num1     ; Store it at label 'num1'
+        INP          ; Get second number
+        ADD num1     ; Add the first number to accumulator
+        OUT          ; Display the result
+        HLT          ; Stop the program
+
+num1:   DAT 0        ; Reserve storage, initialised to 0</pre>
+
+        <h2>Instruction Set</h2>
+
+        <h3>Data Movement</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>LDA</code></td><td>address/label</td><td>Load value from memory into the Accumulator</td></tr>
+            <tr><td><code>STA</code></td><td>address/label</td><td>Store the Accumulator value into memory</td></tr>
+            <tr><td><code>DAT</code></td><td>value (optional)</td><td>Define a data value in memory (default: 0)</td></tr>
+        </table>
+
+        <h3>Arithmetic</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>ADD</code></td><td>address/label</td><td>Add memory value to Accumulator</td></tr>
+            <tr><td><code>SUB</code></td><td>address/label</td><td>Subtract memory value from Accumulator</td></tr>
+            <tr><td><code>MUL</code></td><td>address/label</td><td>Multiply Accumulator by memory value</td></tr>
+            <tr><td><code>DIV</code></td><td>address/label</td><td>Divide Accumulator by memory value (integer division)</td></tr>
+            <tr><td><code>MOD</code></td><td>address/label</td><td>Accumulator modulo memory value</td></tr>
+        </table>
+
+        <h3>Input / Output</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>INP</code></td><td>none</td><td>Read a number from user input into the Accumulator</td></tr>
+            <tr><td><code>OUT</code></td><td>none</td><td>Output the Accumulator as a number</td></tr>
+            <tr><td><code>OTC</code></td><td>none</td><td>Output the Accumulator as an ASCII character</td></tr>
+        </table>
+
+        <h3>Branching</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>BRA</code></td><td>address/label</td><td>Branch always (unconditional jump)</td></tr>
+            <tr><td><code>BRZ</code></td><td>address/label</td><td>Branch if Accumulator is zero</td></tr>
+            <tr><td><code>BRP</code></td><td>address/label</td><td>Branch if Accumulator is positive (≥ 0)</td></tr>
+        </table>
+
+        <h3>Bitwise Operations</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>AND</code></td><td>address/label</td><td>Bitwise AND of Accumulator and memory value</td></tr>
+            <tr><td><code>OR</code></td><td>address/label</td><td>Bitwise OR of Accumulator and memory value</td></tr>
+            <tr><td><code>NOT</code></td><td>none</td><td>Bitwise NOT of the Accumulator</td></tr>
+        </table>
+
+        <h3>Control</h3>
+        <table class="instruction-table">
+            <tr><th>Instruction</th><th>Operand</th><th>Description</th></tr>
+            <tr><td><code>HLT</code></td><td>none</td><td>Halt the program</td></tr>
+        </table>
+
+        <h2>Virtual CPU Architecture</h2>
+        <p>The BMC virtual CPU has the following components:</p>
+
+        <h3>Registers</h3>
+        <table class="instruction-table">
+            <tr><th>Register</th><th>Name</th><th>Description</th></tr>
+            <tr><td><code>ACC</code></td><td>Accumulator</td><td>The main working register. All arithmetic and I/O goes through here.</td></tr>
+            <tr><td><code>PC</code></td><td>Program Counter</td><td>Holds the address of the next instruction to execute.</td></tr>
+            <tr><td><code>MAR</code></td><td>Memory Address Register</td><td>Holds the memory address currently being accessed.</td></tr>
+            <tr><td><code>MDR</code></td><td>Memory Data Register</td><td>Holds the data being read from or written to memory.</td></tr>
+            <tr><td><code>CIR</code></td><td>Current Instruction Register</td><td>Holds the instruction currently being executed.</td></tr>
+            <tr><td><code>SR</code></td><td>Status Register</td><td>CPU flags: Zero (Z), Positive (P), Negative (N)</td></tr>
+        </table>
+
+        <h3>Memory</h3>
+        <p>
+            BMC has <strong>100 memory locations</strong> (addresses 0-99). Each location can store an integer value.
+            Instructions and data share the same memory space (Von Neumann architecture).
+        </p>
+
+        <h3>Fetch-Decode-Execute Cycle</h3>
+        <p>Each step of execution follows this cycle:</p>
+        <ol>
+            <li><strong>Fetch</strong>: Copy PC to MAR, read instruction from memory into MDR, copy to CIR, increment PC.</li>
+            <li><strong>Decode</strong>: Split the instruction into opcode and operand.</li>
+            <li><strong>Execute</strong>: Perform the operation (e.g., load data, arithmetic, branch).</li>
+        </ol>
+
+        <h2>Using the Editor</h2>
+
+        <h3>Controls</h3>
+        <ul>
+            <li><strong>Load</strong> - Parse your code and load it into the virtual CPU memory.</li>
+            <li><strong>Step</strong> - Execute one instruction and see the CPU state change.</li>
+            <li><strong>Run</strong> - Run the program continuously (with a short delay between steps for visualization).</li>
+            <li><strong>Reset</strong> - Reset the CPU to its initial state.</li>
+        </ul>
+
+        <h3>Input & Output</h3>
+        <p>
+            When an <code>INP</code> instruction is executed, the simulator will pause and ask for input.
+            Type a number in the input field and press Send (or Enter).
+            Output from <code>OUT</code> and <code>OTC</code> appears in the Output panel.
+        </p>
+
+        <h3>Saving Programs</h3>
+        <p>
+            Create a free account to save your programs. Saved programs appear on your Dashboard
+            and can be loaded back into the editor at any time.
+        </p>
+
+        <h3>Exporting</h3>
+        <p>
+            Click <strong>Export</strong> to compile your BMC program into a native executable.
+            The program is first translated to Novus source code, then compiled by the Novus compiler.
+            The resulting binary is downloaded to your computer and can be run from the terminal.
+        </p>
+
+        <h2>Example Programs</h2>
+
+        <h3>Countdown from Input</h3>
+        <pre>        INP          ; Get starting number
+loop:   OUT          ; Display current value
+        SUB one      ; Subtract 1
+        BRP loop     ; If still positive, continue
+        HLT          ; Done
+
+one:    DAT 1        ; Constant: 1</pre>
+
+        <h3>Multiply Two Numbers</h3>
+        <pre>        INP          ; First number (multiplier)
+        STA count
+        INP          ; Second number (multiplicand)
+        STA num
+        LDA zero     ; Start result at 0
+        STA result
+loop:   LDA count
+        BRZ done     ; If count is 0, we're done
+        LDA result
+        ADD num      ; Add multiplicand to result
+        STA result
+        LDA count
+        SUB one      ; Decrement counter
+        STA count
+        BRA loop     ; Repeat
+done:   LDA result
+        OUT          ; Display result
+        HLT
+
+count:  DAT 0
+num:    DAT 0
+result: DAT 0
+zero:   DAT 0
+one:    DAT 1</pre>
+
+        <h3>Print "HI" Using Character Output</h3>
+        <pre>        LDA charH    ; Load ASCII 72 (H)
+        OTC          ; Output as character
+        LDA charI    ; Load ASCII 73 (I)
+        OTC          ; Output as character
+        HLT
+
+charH:  DAT 72       ; ASCII 'H'
+charI:  DAT 73       ; ASCII 'I'</pre>
+
+        <h3>Fibonacci Sequence</h3>
+        <pre>        LDA zero     ; a = 0
+        STA a
+        LDA one      ; b = 1
+        STA b
+        LDA count    ; Loop 10 times
+        STA i
+loop:   LDA a
+        OUT          ; Output current number
+        ADD b        ; next = a + b
+        STA temp
+        LDA b
+        STA a        ; a = b
+        LDA temp
+        STA b        ; b = next
+        LDA i
+        SUB one
+        STA i
+        BRP loop
+        HLT
+
+a:      DAT 0
+b:      DAT 1
+temp:   DAT 0
+i:      DAT 0
+count:  DAT 10
+zero:   DAT 0
+one:    DAT 1</pre>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand"><span class="nav-logo">⚡</span> Big Man Computer</div>
+            <div class="footer-links">
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/credits">Credits</a>
+                <a href="https://github.com/MJDaws0n/BigManComputer" target="_blank">GitHub</a>
+            </div>
+            <p class="footer-copy">Built with <a href="https://github.com/MJDaws0n/Novus" target="_blank">Novus</a></p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

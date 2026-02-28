@@ -1,0 +1,235 @@
+// ---------------------------------------------------------------------------
+// api/programs - Program CRUD API endpoints
+// Save, load, list, delete BMC programs for logged-in users
+// Programs table: username|name|code|created_at|updated_at
+// ---------------------------------------------------------------------------
+
+module api_programs;
+
+import ../../lib/std/main;
+import ../../lib/http/main;
+import ../../lib/time/main;
+
+import ../db;
+import ../api/auth;
+
+// ---------------------------------------------------------------------------
+// Initialise programs table
+// ---------------------------------------------------------------------------
+
+fn programs_init() -> void {
+    db_create_table("programs");
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/programs/save - Save or update a program
+// Body: {"name":"...", "code":"..."}
+// ---------------------------------------------------------------------------
+
+fn handle_save_program(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    let body: str = api_get_body(request);
+    let name: str = json_get_value(body, "name");
+    let code: str = json_get_value(body, "code");
+
+    if (len(name) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Program name required\"}");
+        return;
+    }
+
+    let timestamp: str = i64_to_str(get_time_s());
+
+    // Check if program with this name exists for this user
+    let all_progs: str = db_find_all_by_field("programs", 0, username);
+    let found: bool = false;
+    let pi: i32 = 0;
+    let pstart: i32 = 0;
+    while (pi <= len(all_progs)) {
+        if (pi == len(all_progs) || all_progs[pi] == '\n') {
+            let prow: str = substr_len(all_progs, pstart, pi - pstart);
+            if (len(prow) > 0) {
+                let pname: str = db_get_field(prow, 1);
+                if (pname == name) {
+                    found = true;
+                }
+            }
+            pstart = pi + 1;
+        }
+        pi = pi + 1;
+    }
+
+    if (found) {
+        // Delete old version
+        // Read all data, filter out matching rows
+        let data: str = db_read_all("programs");
+        let result: str = "";
+        let si: i32 = 0;
+        let sstart: i32 = 0;
+        while (si <= len(data)) {
+            if (si == len(data) || data[si] == '\n') {
+                let srow: str = substr_len(data, sstart, si - sstart);
+                if (len(srow) > 0) {
+                    let su: str = db_get_field(srow, 0);
+                    let sn: str = db_get_field(srow, 1);
+                    if (su != username || sn != name) {
+                        result = result + srow + "\n";
+                    }
+                }
+                sstart = si + 1;
+            }
+            si = si + 1;
+        }
+        db_write_all("programs", result);
+    }
+
+    // Escape pipe characters in code to prevent corruption
+    let safe_code: str = str_replace(code, "|", "%%PIPE%%");
+    let safe_name: str = str_replace(name, "|", "_");
+    let row: str = username + "|" + safe_name + "|" + safe_code + "|" + timestamp + "|" + timestamp;
+    db_append_row("programs", row);
+
+    api_send_json(client_fd, 200, "{\"ok\":true}");
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/programs/list - List all programs for logged-in user
+// ---------------------------------------------------------------------------
+
+fn handle_list_programs(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    let all_progs: str = db_find_all_by_field("programs", 0, username);
+    let json: str = "{\"ok\":true,\"programs\":[";
+    let count: i32 = 0;
+
+    let pi: i32 = 0;
+    let pstart: i32 = 0;
+    while (pi <= len(all_progs)) {
+        if (pi == len(all_progs) || all_progs[pi] == '\n') {
+            let prow: str = substr_len(all_progs, pstart, pi - pstart);
+            if (len(prow) > 0) {
+                if (count > 0) { json = json + ","; }
+                let pname: str = db_get_field(prow, 1);
+                let pcreated: str = db_get_field(prow, 3);
+                let pupdated: str = db_get_field(prow, 4);
+                let pcode: str = str_replace(db_get_field(prow, 2), "%%PIPE%%", "|");
+                json = json + "{\"name\":\"" + json_escape(pname) + "\",";
+                json = json + "\"code\":\"" + json_escape(pcode) + "\",";
+                json = json + "\"created_at\":\"" + pcreated + "\",";
+                json = json + "\"updated_at\":\"" + pupdated + "\"}";
+                count = count + 1;
+            }
+            pstart = pi + 1;
+        }
+        pi = pi + 1;
+    }
+
+    json = json + "]}";
+    api_send_json(client_fd, 200, json);
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/programs/load?name=... - Load a specific program
+// ---------------------------------------------------------------------------
+
+fn handle_load_program(request: str, client_fd: i32, path: str) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    let qs: str = http_get_query_string(path);
+    let name: str = "";
+    if (starts_with(qs, "name=")) {
+        name = http_url_decode(substr(qs, 5));
+    }
+
+    if (len(name) == 0) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Program name required\"}");
+        return;
+    }
+
+    let all_progs: str = db_find_all_by_field("programs", 0, username);
+    let pi: i32 = 0;
+    let pstart: i32 = 0;
+    while (pi <= len(all_progs)) {
+        if (pi == len(all_progs) || all_progs[pi] == '\n') {
+            let prow: str = substr_len(all_progs, pstart, pi - pstart);
+            if (len(prow) > 0) {
+                let pname: str = db_get_field(prow, 1);
+                if (pname == name) {
+                    let code: str = db_get_field(prow, 2);
+                    // Unescape pipe characters
+                    code = str_replace(code, "%%PIPE%%", "|");
+                    let json: str = "{\"ok\":true,\"name\":\"" + json_escape(name) + "\",\"code\":\"" + json_escape(code) + "\"}";
+                    api_send_json(client_fd, 200, json);
+                    return;
+                }
+            }
+            pstart = pi + 1;
+        }
+        pi = pi + 1;
+    }
+
+    api_send_json(client_fd, 404, "{\"ok\":false,\"error\":\"Program not found\"}");
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/programs/delete - Delete a program
+// Body: {"name":"..."}
+// ---------------------------------------------------------------------------
+
+fn handle_delete_program(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    let body: str = api_get_body(request);
+    let name: str = json_get_value(body, "name");
+
+    // Delete matching row
+    let data: str = db_read_all("programs");
+    let result: str = "";
+    let deleted: i32 = 0;
+    let si: i32 = 0;
+    let sstart: i32 = 0;
+    while (si <= len(data)) {
+        if (si == len(data) || data[si] == '\n') {
+            let srow: str = substr_len(data, sstart, si - sstart);
+            if (len(srow) > 0) {
+                let su: str = db_get_field(srow, 0);
+                let sn: str = db_get_field(srow, 1);
+                if (su == username && sn == name) {
+                    deleted = deleted + 1;
+                } else {
+                    result = result + srow + "\n";
+                }
+            }
+            sstart = si + 1;
+        }
+        si = si + 1;
+    }
+    db_write_all("programs", result);
+
+    if (deleted > 0) {
+        api_send_json(client_fd, 200, "{\"ok\":true}");
+    } else {
+        api_send_json(client_fd, 404, "{\"ok\":false,\"error\":\"Program not found\"}");
+    }
+}

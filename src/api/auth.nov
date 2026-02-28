@@ -1,0 +1,309 @@
+// ---------------------------------------------------------------------------
+// api/auth - Authentication API endpoints
+// Handles signup, login, logout, session validation, account deletion
+// ---------------------------------------------------------------------------
+
+module api_auth;
+
+import ../../lib/std/main;
+import ../../lib/net/main;
+import ../../lib/http/main;
+import ../../lib/time/main;
+
+import ../db;
+import ../hash;
+
+// ---------------------------------------------------------------------------
+// Initialise auth tables
+// Users table: username|password_hash|salt|created_at
+// Sessions table: token|username|created_at|expires_at
+// ---------------------------------------------------------------------------
+
+fn auth_init() -> void {
+    db_create_table("users");
+    db_create_table("sessions");
+    db_create_table("consent");
+}
+
+// ---------------------------------------------------------------------------
+// Extract session token from Cookie header
+// ---------------------------------------------------------------------------
+
+fn get_session_cookie(request: str) -> str {
+    let pos: i32 = str_find(request, "Cookie:");
+    if (pos < 0) {
+        pos = str_find(request, "cookie:");
+    }
+    if (pos < 0) { return ""; }
+    let line_rest: str = substr(request, pos + 7);
+    let line_end: i32 = str_find(line_rest, "\n");
+    if (line_end < 0) { line_end = len(line_rest); }
+    let cookie_line: str = str_trim(substr_len(line_rest, 0, line_end));
+
+    // Find bmc_session=value
+    let sid_pos: i32 = str_find(cookie_line, "bmc_session=");
+    if (sid_pos < 0) { return ""; }
+    let token_start: str = substr(cookie_line, sid_pos + 12);
+    let semi: i32 = str_find(token_start, ";");
+    if (semi < 0) { semi = len(token_start); }
+    return str_trim(substr_len(token_start, 0, semi));
+}
+
+// ---------------------------------------------------------------------------
+// Validate session and return username or ""
+// ---------------------------------------------------------------------------
+
+fn validate_session(token: str) -> str {
+    if (len(token) == 0) { return ""; }
+    let row: str = db_find_by_field("sessions", 0, token);
+    if (len(row) == 0) { return ""; }
+    return db_get_field(row, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Handle signup: POST /api/signup
+// Body: {"username":"...","password":"..."}
+// ---------------------------------------------------------------------------
+
+fn handle_signup(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let username: str = json_get_value(body, "username");
+    let password: str = json_get_value(body, "password");
+
+    if (len(username) < 3 || len(password) < 6) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Username must be 3+ chars, password 6+ chars\"}");
+        return;
+    }
+
+    // Check username is alphanumeric
+    let valid: bool = true;
+    let vi: i32 = 0;
+    while (vi < len(username)) {
+        let ch: i32 = username[vi] & 255;
+        if (!is_alnum(ch) && ch != 95) {
+            valid = false;
+        }
+        vi = vi + 1;
+    }
+    if (!valid) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Username must be alphanumeric or underscore\"}");
+        return;
+    }
+
+    let existing: str = db_find_by_field("users", 0, username);
+    if (len(existing) > 0) {
+        api_send_json(client_fd, 409, "{\"ok\":false,\"error\":\"Username already taken\"}");
+        return;
+    }
+
+    let salt: str = make_salt(username);
+    let pw_hash: str = hash_password(password, salt);
+    let timestamp: str = i64_to_str(get_time_s());
+
+    // Store user
+    let row: str = username + "|" + pw_hash + "|" + salt + "|" + timestamp;
+    db_append_row("users", row);
+
+    // Create session
+    let token: str = generate_session_token(username, timestamp);
+    let session_row: str = token + "|" + username + "|" + timestamp + "|0";
+    db_append_row("sessions", session_row);
+
+    let resp: str = "{\"ok\":true,\"username\":\"" + json_escape(username) + "\"}";
+    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800";
+    api_send_json_cookie(client_fd, 200, resp, cookie);
+}
+
+// ---------------------------------------------------------------------------
+// Handle login: POST /api/login
+// ---------------------------------------------------------------------------
+
+fn handle_login(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let username: str = json_get_value(body, "username");
+    let password: str = json_get_value(body, "password");
+
+    let user_row: str = db_find_by_field("users", 0, username);
+    if (len(user_row) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Invalid username or password\"}");
+        return;
+    }
+
+    let stored_hash: str = db_get_field(user_row, 1);
+    let salt: str = db_get_field(user_row, 2);
+
+    if (!verify_password(password, salt, stored_hash)) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Invalid username or password\"}");
+        return;
+    }
+
+    let timestamp: str = i64_to_str(get_time_s());
+    let token: str = generate_session_token(username, timestamp);
+    let session_row: str = token + "|" + username + "|" + timestamp + "|0";
+    db_append_row("sessions", session_row);
+
+    let resp: str = "{\"ok\":true,\"username\":\"" + json_escape(username) + "\"}";
+    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800";
+    api_send_json_cookie(client_fd, 200, resp, cookie);
+}
+
+// ---------------------------------------------------------------------------
+// Handle logout: POST /api/logout
+// ---------------------------------------------------------------------------
+
+fn handle_logout(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    if (len(token) > 0) {
+        db_delete_by_field("sessions", 0, token);
+    }
+    let resp: str = "{\"ok\":true}";
+    let cookie: str = "bmc_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0";
+    api_send_json_cookie(client_fd, 200, resp, cookie);
+}
+
+// ---------------------------------------------------------------------------
+// Handle session check: GET /api/me
+// ---------------------------------------------------------------------------
+
+fn handle_me(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 200, "{\"ok\":false}");
+        return;
+    }
+    let resp: str = "{\"ok\":true,\"username\":\"" + json_escape(username) + "\"}";
+    api_send_json(client_fd, 200, resp);
+}
+
+// ---------------------------------------------------------------------------
+// GDPR: Delete account and all data: DELETE /api/account
+// ---------------------------------------------------------------------------
+
+fn handle_delete_account(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    // Delete user data
+    db_delete_by_field("users", 0, username);
+    db_delete_by_field("sessions", 1, username);
+    db_delete_by_field("programs", 0, username);
+    db_delete_by_field("consent", 0, username);
+
+    let cookie: str = "bmc_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0";
+    api_send_json_cookie(client_fd, 200, "{\"ok\":true}", cookie);
+}
+
+// ---------------------------------------------------------------------------
+// GDPR: Export user data: GET /api/export-data
+// ---------------------------------------------------------------------------
+
+fn handle_export_data(request: str, client_fd: i32) -> void {
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) {
+        api_send_json(client_fd, 401, "{\"ok\":false,\"error\":\"Not logged in\"}");
+        return;
+    }
+
+    let user_row: str = db_find_by_field("users", 0, username);
+    let programs: str = db_find_all_by_field("programs", 0, username);
+
+    let data: str = "{\"username\":\"" + json_escape(username) + "\",";
+    data = data + "\"created\":\"" + json_escape(db_get_field(user_row, 3)) + "\",";
+    data = data + "\"programs\":[";
+
+    // Parse programs
+    let prog_count: i32 = 0;
+    let pi: i32 = 0;
+    let pstart: i32 = 0;
+    while (pi <= len(programs)) {
+        if (pi == len(programs) || programs[pi] == '\n') {
+            let prow: str = substr_len(programs, pstart, pi - pstart);
+            if (len(prow) > 0) {
+                if (prog_count > 0) { data = data + ","; }
+                data = data + "{\"name\":\"" + json_escape(db_get_field(prow, 1)) + "\",";
+                data = data + "\"code\":\"" + json_escape(db_get_field(prow, 2)) + "\"}";
+                prog_count = prog_count + 1;
+            }
+            pstart = pi + 1;
+        }
+        pi = pi + 1;
+    }
+
+    data = data + "]}";
+    api_send_json(client_fd, 200, data);
+}
+
+// ---------------------------------------------------------------------------
+// GDPR: Record consent: POST /api/consent
+// ---------------------------------------------------------------------------
+
+fn handle_consent(request: str, client_fd: i32) -> void {
+    let body: str = api_get_body(request);
+    let consent_type: str = json_get_value(body, "type");
+    let token: str = get_session_cookie(request);
+    let username: str = validate_session(token);
+    if (len(username) == 0) { username = "anonymous"; }
+    let timestamp: str = i64_to_str(get_time_s());
+    let row: str = username + "|" + consent_type + "|" + timestamp;
+    db_append_row("consent", row);
+    api_send_json(client_fd, 200, "{\"ok\":true}");
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helper: send JSON response with cookie
+// ---------------------------------------------------------------------------
+
+fn api_send_json_cookie(client_fd: i32, status_code: i32, body: str, cookie: str) -> void {
+    let status_line: str = "HTTP/1.1 " + i32_to_str(status_code) + " OK";
+    if (status_code == 400) { status_line = "HTTP/1.1 400 Bad Request"; }
+    if (status_code == 401) { status_line = "HTTP/1.1 401 Unauthorized"; }
+    if (status_code == 409) { status_line = "HTTP/1.1 409 Conflict"; }
+
+    let response: str = status_line + "\r\n";
+    response = response + "Content-Type: application/json\r\n";
+    response = response + "Content-Length: " + i32_to_str(len(body)) + "\r\n";
+    response = response + "Set-Cookie: " + cookie + "\r\n";
+    response = response + "Access-Control-Allow-Origin: *\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    response = response + body;
+    net_write_str(client_fd, response);
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helper: send JSON response
+// ---------------------------------------------------------------------------
+
+fn api_send_json(client_fd: i32, status_code: i32, body: str) -> void {
+    let status_line: str = "HTTP/1.1 " + i32_to_str(status_code) + " OK";
+    if (status_code == 400) { status_line = "HTTP/1.1 400 Bad Request"; }
+    if (status_code == 401) { status_line = "HTTP/1.1 401 Unauthorized"; }
+    if (status_code == 404) { status_line = "HTTP/1.1 404 Not Found"; }
+    if (status_code == 409) { status_line = "HTTP/1.1 409 Conflict"; }
+    if (status_code == 500) { status_line = "HTTP/1.1 500 Internal Server Error"; }
+
+    let response: str = status_line + "\r\n";
+    response = response + "Content-Type: application/json\r\n";
+    response = response + "Content-Length: " + i32_to_str(len(body)) + "\r\n";
+    response = response + "Access-Control-Allow-Origin: *\r\n";
+    response = response + "Connection: close\r\n";
+    response = response + "\r\n";
+    response = response + body;
+    net_write_str(client_fd, response);
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helper: get body from raw request
+// ---------------------------------------------------------------------------
+
+fn api_get_body(request: str) -> str {
+    let sep: i32 = str_find(request, "\n\n");
+    if (sep < 0) { return ""; }
+    return substr(request, sep + 2);
+}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credits - Big Man Computer</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/"><span class="nav-logo">⚡</span><span class="nav-title">BMC</span></a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/editor" class="nav-link">Editor</a>
+            <a href="/help" class="nav-link">Help</a>
+            <a href="/credits" class="nav-link active">Credits</a>
+            <div class="nav-auth" id="nav-auth">
+                <a href="/login" class="btn btn-outline btn-sm">Log In</a>
+                <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content-page">
+        <h1>Credits &amp; <span class="gradient-text">Acknowledgements</span></h1>
+
+        <h2>Big Man Computer</h2>
+        <p>
+            BMC is an educational CPU simulator inspired by the <strong>Little Man Computer</strong> (LMC),
+            a model created by Dr. Stuart Madnick in 1965. BMC enhances the LMC model with additional
+            instructions and a modern web-based interface for interactive learning.
+        </p>
+
+        <h2>Created By</h2>
+        <p>
+            <strong>MJ Dawson</strong> — Developer &amp; Designer<br>
+            <a href="https://mjdawson.net" target="_blank">mjdawson.net</a> ·
+            <a href="https://github.com/MJDaws0n" target="_blank">GitHub</a>
+        </p>
+
+        <h2>Built With</h2>
+        <ul>
+            <li><strong><a href="https://github.com/MJDaws0n/Novus" target="_blank">Novus</a></strong> — A compiled systems programming language. The entire BMC server is written in Novus and compiles to native ARM64/x86_64 code.</li>
+            <li><strong><a href="https://github.com/MJDaws0n/Nox" target="_blank">Nox</a></strong> — Package manager for Novus. Used to manage dependencies and project structure.</li>
+        </ul>
+
+        <h2>Novus Libraries Used</h2>
+        <ul>
+            <li><code>novus-std</code> — Standard library (I/O, strings, utilities)</li>
+            <li><code>novus-net</code> — Network sockets</li>
+            <li><code>novus-http</code> — HTTP server framework</li>
+            <li><code>novus-file_io</code> — File system operations</li>
+            <li><code>novus-process</code> — Process management (fork, exec)</li>
+            <li><code>novus-env</code> — Environment variables</li>
+            <li><code>novus-time</code> — Time and timers</li>
+            <li><code>novus-maths</code> — Mathematics functions</li>
+        </ul>
+
+        <h2>The Little Man Computer</h2>
+        <p>
+            The LMC was designed as a simple instructional model of a Von Neumann architecture
+            computer. It features an accumulator, a program counter, and a fixed number of memory
+            locations. BMC follows this design philosophy while adding enhancements to make it
+            a more complete learning tool.
+        </p>
+        <p>
+            The LMC concept is in the public domain and is widely used in computer science
+            education around the world, particularly in A-Level Computer Science courses in the UK.
+        </p>
+
+        <h2>License</h2>
+        <p>
+            Big Man Computer is open source. See the
+            <a href="https://github.com/MJDaws0n/BigManComputer" target="_blank">GitHub repository</a>
+            for details.
+        </p>
+
+        <h2>Special Thanks</h2>
+        <ul>
+            <li>Dr. Stuart Madnick for creating the original Little Man Computer model</li>
+            <li>The Novus community for building an amazing compiled language</li>
+            <li>All CS students learning about CPU architecture — this is for you! 🎓</li>
+        </ul>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand"><span class="nav-logo">⚡</span> Big Man Computer</div>
+            <div class="footer-links">
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/credits">Credits</a>
+                <a href="https://github.com/MJDaws0n/BigManComputer" target="_blank">GitHub</a>
+            </div>
+            <p class="footer-copy">Built with <a href="https://github.com/MJDaws0n/Novus" target="_blank">Novus</a></p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

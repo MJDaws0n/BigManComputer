@@ -1,0 +1,290 @@
+// ---------------------------------------------------------------------------
+// db - Simple binary database library for Novus
+// Stores data in a pipe-delimited text format for simplicity and speed.
+// Each "table" is a file in the data/ directory.
+// Records are newline-separated, fields are pipe-separated.
+// ---------------------------------------------------------------------------
+
+module db;
+
+import ../lib/std/main;
+import ../lib/file_io/main;
+import ../lib/time/main;
+
+// ---------------------------------------------------------------------------
+// Initialise the database directory
+// ---------------------------------------------------------------------------
+
+fn db_init() -> void {
+    if (!file_exists("data")) {
+        sys_mkdir("data", 493);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Get the file path for a table
+// ---------------------------------------------------------------------------
+
+fn db_table_path(table: str) -> str {
+    return "data/" + table + ".db";
+}
+
+// ---------------------------------------------------------------------------
+// Check if a table exists
+// ---------------------------------------------------------------------------
+
+fn db_table_exists(table: str) -> bool {
+    return file_exists(db_table_path(table));
+}
+
+// ---------------------------------------------------------------------------
+// Create a table (just creates an empty file)
+// ---------------------------------------------------------------------------
+
+fn db_create_table(table: str) -> void {
+    if (!db_table_exists(table)) {
+        write_file(db_table_path(table), "");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Read all rows from a table as a single string
+// ---------------------------------------------------------------------------
+
+fn db_read_all(table: str) -> str {
+    if (!db_table_exists(table)) { return ""; }
+    return read_file(db_table_path(table));
+}
+
+// ---------------------------------------------------------------------------
+// Append a row to a table
+// ---------------------------------------------------------------------------
+
+fn db_append_row(table: str, row: str) -> void {
+    file_append(db_table_path(table), row + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Write all data back to a table (full rewrite)
+// ---------------------------------------------------------------------------
+
+fn db_write_all(table: str, data: str) -> void {
+    write_file(db_table_path(table), data);
+}
+
+// ---------------------------------------------------------------------------
+// Count rows in a table
+// ---------------------------------------------------------------------------
+
+fn db_count_rows(table: str) -> i32 {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return 0; }
+    let count: i32 = 0;
+    let i: i32 = 0;
+    while (i < len(data)) {
+        if (data[i] == '\n') { count = count + 1; }
+        i = i + 1;
+    }
+    return count;
+}
+
+// ---------------------------------------------------------------------------
+// Get a specific row by index (0-based)
+// ---------------------------------------------------------------------------
+
+fn db_get_row(table: str, index: i32) -> str {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return ""; }
+    let row_num: i32 = 0;
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i < len(data)) {
+        if (data[i] == '\n') {
+            if (row_num == index) {
+                return substr_len(data, start, i - start);
+            }
+            row_num = row_num + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+// ---------------------------------------------------------------------------
+// Find a row where field at field_index matches value
+// Fields are pipe-separated. Returns the full row or "" if not found.
+// ---------------------------------------------------------------------------
+
+fn db_find_by_field(table: str, field_index: i32, value: str) -> str {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return ""; }
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(data)) {
+        let is_end: bool = (i == len(data));
+        if (is_end || data[i] == '\n') {
+            let row: str = substr_len(data, start, i - start);
+            if (len(row) > 0) {
+                let field: str = db_get_field(row, field_index);
+                if (field == value) {
+                    return row;
+                }
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+// ---------------------------------------------------------------------------
+// Get a field from a pipe-separated row
+// ---------------------------------------------------------------------------
+
+fn db_get_field(row: str, field_index: i32) -> str {
+    let current: i32 = 0;
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(row)) {
+        let is_end: bool = (i == len(row));
+        if (is_end || row[i] == '|') {
+            if (current == field_index) {
+                return substr_len(row, start, i - start);
+            }
+            current = current + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+// ---------------------------------------------------------------------------
+// Delete rows where field at field_index matches value
+// ---------------------------------------------------------------------------
+
+fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return 0; }
+    let result: str = "";
+    let deleted: i32 = 0;
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(data)) {
+        let is_end: bool = (i == len(data));
+        if (is_end || data[i] == '\n') {
+            let row: str = substr_len(data, start, i - start);
+            if (len(row) > 0) {
+                let field: str = db_get_field(row, field_index);
+                if (field != value) {
+                    result = result + row + "\n";
+                } else {
+                    deleted = deleted + 1;
+                }
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    db_write_all(table, result);
+    return deleted;
+}
+
+// ---------------------------------------------------------------------------
+// Update a field in rows matching a condition
+// ---------------------------------------------------------------------------
+
+fn db_update_field(table: str, match_field: i32, match_value: str, update_field: i32, new_value: str) -> i32 {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return 0; }
+    let result: str = "";
+    let updated: i32 = 0;
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(data)) {
+        let is_end: bool = (i == len(data));
+        if (is_end || data[i] == '\n') {
+            let row: str = substr_len(data, start, i - start);
+            if (len(row) > 0) {
+                let field: str = db_get_field(row, match_field);
+                if (field == match_value) {
+                    let new_row: str = db_set_field(row, update_field, new_value);
+                    result = result + new_row + "\n";
+                    updated = updated + 1;
+                } else {
+                    result = result + row + "\n";
+                }
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    db_write_all(table, result);
+    return updated;
+}
+
+// ---------------------------------------------------------------------------
+// Set a specific field in a pipe-separated row
+// ---------------------------------------------------------------------------
+
+fn db_set_field(row: str, field_index: i32, new_value: str) -> str {
+    let result: str = "";
+    let current: i32 = 0;
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(row)) {
+        let is_end: bool = (i == len(row));
+        if (is_end || row[i] == '|') {
+            if (current == field_index) {
+                result = result + new_value;
+            } else {
+                result = result + substr_len(row, start, i - start);
+            }
+            if (!is_end) {
+                result = result + "|";
+            }
+            current = current + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Get all rows matching a field value (returns newline-separated)
+// ---------------------------------------------------------------------------
+
+fn db_find_all_by_field(table: str, field_index: i32, value: str) -> str {
+    let data: str = db_read_all(table);
+    if (len(data) == 0) { return ""; }
+    let result: str = "";
+    let start: i32 = 0;
+    let i: i32 = 0;
+    while (i <= len(data)) {
+        let is_end: bool = (i == len(data));
+        if (is_end || data[i] == '\n') {
+            let row: str = substr_len(data, start, i - start);
+            if (len(row) > 0) {
+                let field: str = db_get_field(row, field_index);
+                if (field == value) {
+                    result = result + row + "\n";
+                }
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Generate a simple unique ID based on timestamp + counter
+// ---------------------------------------------------------------------------
+
+fn db_generate_id() -> str {
+    let t: i64 = get_time_us();
+    let ts: str = i64_to_str(t);
+    return ts;
+}

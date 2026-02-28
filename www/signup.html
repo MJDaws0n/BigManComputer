@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Big Man Computer</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/"><span class="nav-logo">⚡</span><span class="nav-title">BMC</span></a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/editor" class="nav-link">Editor</a>
+            <a href="/help" class="nav-link">Help</a>
+            <a href="/credits" class="nav-link">Credits</a>
+            <div class="nav-auth" id="nav-auth">
+                <a href="/login" class="btn btn-outline btn-sm">Log In</a>
+                <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="form-page">
+        <div class="form-card">
+            <h2>Create Account</h2>
+            <p class="form-subtitle">Sign up to save your BMC programs</p>
+
+            <div class="alert alert-error" id="signup-error"></div>
+            <div class="alert alert-success" id="signup-success"></div>
+
+            <form id="signup-form" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Choose a username" required autocomplete="username" minlength="3" maxlength="32">
+                    <div class="form-error" id="username-error">Username must be 3-32 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Choose a password" required autocomplete="new-password" minlength="6">
+                    <div class="form-error" id="password-error">Password must be at least 6 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password</label>
+                    <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your password" required autocomplete="new-password">
+                    <div class="form-error" id="confirm-error">Passwords do not match</div>
+                </div>
+                <div class="form-group" style="display:flex;gap:0.5rem;align-items:flex-start;">
+                    <input type="checkbox" id="consent" required style="margin-top:0.3rem;">
+                    <label for="consent" style="font-size:0.85rem;color:var(--text-secondary);font-weight:400;">
+                        I agree to the <a href="/privacy">Privacy Policy</a>. I understand that my username and hashed password will be stored, and that I can delete my account and all data at any time.
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="signup-btn">Create Account</button>
+                </div>
+            </form>
+
+            <div class="form-footer">
+                Already have an account? <a href="/login">Log in</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        document.getElementById('signup-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const errorEl = document.getElementById('signup-error');
+            const successEl = document.getElementById('signup-success');
+            const btn = document.getElementById('signup-btn');
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm-password').value;
+            const consent = document.getElementById('consent').checked;
+
+            if (username.length < 3) {
+                document.getElementById('username-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('username-error').style.display = 'none';
+
+            if (password.length < 6) {
+                document.getElementById('password-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('password-error').style.display = 'none';
+
+            if (password !== confirm) {
+                document.getElementById('confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('confirm-error').style.display = 'none';
+
+            if (!consent) {
+                errorEl.textContent = 'You must agree to the Privacy Policy to create an account.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Creating account...';
+
+            try {
+                const res = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    // Record GDPR consent
+                    fetch('/api/consent', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ username, consent_type: 'privacy_policy' })
+                    });
+                    successEl.textContent = 'Account created! Redirecting...';
+                    successEl.style.display = 'block';
+                    setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+                } else {
+                    errorEl.textContent = data.error || 'Signup failed';
+                    errorEl.style.display = 'block';
+                }
+            } catch(err) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                errorEl.style.display = 'block';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        });
+    </script>
+</body>
+</html>

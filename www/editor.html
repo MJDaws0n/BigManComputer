@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor - Big Man Computer</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/"><span class="nav-logo">⚡</span><span class="nav-title">BMC</span></a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/editor" class="nav-link active">Editor</a>
+            <a href="/help" class="nav-link">Help</a>
+            <a href="/credits" class="nav-link">Credits</a>
+            <div class="nav-auth" id="nav-auth">
+                <a href="/login" class="btn btn-outline btn-sm">Log In</a>
+                <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="editor-layout">
+        <!-- Toolbar -->
+        <div class="editor-toolbar">
+            <div class="toolbar-left">
+                <button class="btn btn-primary btn-sm" id="btn-load" title="Load program into simulator">▶ Load</button>
+                <button class="btn btn-outline btn-sm" id="btn-step" title="Execute one instruction" disabled>⏭ Step</button>
+                <button class="btn btn-outline btn-sm" id="btn-run" title="Run to completion" disabled>⏩ Run</button>
+                <button class="btn btn-outline btn-sm" id="btn-reset" title="Reset simulator" disabled>↺ Reset</button>
+                <div class="toolbar-sep"></div>
+                <span class="toolbar-status status-ready" id="status-indicator">● Ready</span>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn btn-ghost btn-sm" id="btn-save" title="Save program (requires login)">💾 Save</button>
+                <button class="btn btn-ghost btn-sm" id="btn-export" title="Export as executable">📦 Export</button>
+                <button class="btn btn-ghost btn-sm" id="btn-export-src" title="Export Novus source">📄 Source</button>
+                <div class="toolbar-sep"></div>
+                <select id="example-select" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-xs);padding:0.3rem 0.5rem;font-size:0.8rem;outline:none;cursor:pointer;">
+                    <option value="">Load Example...</option>
+                    <option value="add">Add Two Numbers</option>
+                    <option value="countdown">Countdown</option>
+                    <option value="multiply">Multiply</option>
+                    <option value="fibonacci">Fibonacci</option>
+                    <option value="echo">Echo Characters</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Code Editor -->
+        <div class="editor-pane">
+            <div class="editor-pane-header">
+                <span>📝 Code Editor</span>
+                <span id="line-count">Lines: 1</span>
+            </div>
+            <div class="editor-container">
+                <div class="line-numbers" id="line-numbers">1</div>
+                <textarea class="code-input" id="code-input" spellcheck="false" placeholder="; Write your BMC assembly here...
+; Try: INP, OUT, ADD, SUB, HLT
+; Use /help for the full instruction set"></textarea>
+            </div>
+        </div>
+
+        <!-- CPU Visualization -->
+        <div class="viz-pane">
+            <div class="viz-pane-header">
+                <span>🔧 CPU Visualization</span>
+                <span id="step-counter">Step: 0</span>
+            </div>
+            <div class="cpu-diagram" id="cpu-diagram">
+                <!-- Registers -->
+                <div class="cpu-section">
+                    <div class="cpu-section-title">Registers</div>
+                    <div class="registers-grid">
+                        <div class="register-box" id="reg-acc" title="Accumulator: Main working register">
+                            <div class="register-name">ACC</div>
+                            <div class="register-value" id="val-acc">000</div>
+                            <div class="register-desc">Accumulator</div>
+                        </div>
+                        <div class="register-box" id="reg-pc" title="Program Counter: Address of next instruction">
+                            <div class="register-name">PC</div>
+                            <div class="register-value" id="val-pc">000</div>
+                            <div class="register-desc">Program Counter</div>
+                        </div>
+                        <div class="register-box" id="reg-mar" title="Memory Address Register: Address being accessed">
+                            <div class="register-name">MAR</div>
+                            <div class="register-value" id="val-mar">000</div>
+                            <div class="register-desc">Mem Address</div>
+                        </div>
+                        <div class="register-box" id="reg-mdr" title="Memory Data Register: Data being transferred">
+                            <div class="register-name">MDR</div>
+                            <div class="register-value" id="val-mdr">000</div>
+                            <div class="register-desc">Mem Data</div>
+                        </div>
+                        <div class="register-box" id="reg-cir" title="Current Instruction Register: Instruction being executed">
+                            <div class="register-name">CIR</div>
+                            <div class="register-value" id="val-cir">---</div>
+                            <div class="register-desc">Curr Instruction</div>
+                        </div>
+                        <div class="register-box" id="reg-sr" title="Status Register: CPU flags (Z=Zero, P=Positive, N=Negative)">
+                            <div class="register-name">SR</div>
+                            <div class="register-value" id="val-sr">---</div>
+                            <div class="register-desc">Status Flags</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ALU -->
+                <div class="cpu-section">
+                    <div class="cpu-section-title">Arithmetic Logic Unit</div>
+                    <div class="data-bus" id="bus-top"></div>
+                    <div class="alu-box" id="alu-box">
+                        <div class="alu-label">ALU</div>
+                        <div class="alu-operation" id="alu-op">Idle</div>
+                    </div>
+                    <div class="data-bus" id="bus-bottom"></div>
+                </div>
+
+                <!-- Memory -->
+                <div class="cpu-section">
+                    <div class="cpu-section-title">Memory (100 Locations)</div>
+                    <div class="memory-grid" id="memory-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- I/O Panel -->
+        <div class="io-panel">
+            <div class="io-section">
+                <div class="io-header">📤 Output</div>
+                <div class="io-content" id="output-area"></div>
+            </div>
+            <div class="io-section">
+                <div class="io-header">📥 Input</div>
+                <div class="io-content" id="input-display"></div>
+                <div class="io-input-bar" id="input-bar" style="display:none">
+                    <input type="text" id="input-field" placeholder="Enter a value..." autocomplete="off">
+                    <button id="btn-send-input">Send</button>
+                </div>
+            </div>
+            <div class="io-section">
+                <div class="io-header">📋 Execution Log</div>
+                <div class="io-content exec-log" id="exec-log"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Dialog -->
+    <div id="save-dialog" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:500;display:none;align-items:center;justify-content:center;">
+        <div class="form-card" style="max-width:400px;width:90%;">
+            <h3 style="margin-bottom:1rem;">Save Program</h3>
+            <div class="form-group">
+                <label for="save-name">Program Name</label>
+                <input type="text" id="save-name" placeholder="My Program">
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-primary btn-sm" id="btn-save-confirm">Save</button>
+                <button class="btn btn-outline btn-sm" id="btn-save-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/editor.js"></script>
+    <script src="/js/simulator.js"></script>
+</body>
+</html>

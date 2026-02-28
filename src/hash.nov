@@ -1,0 +1,77 @@
+// ---------------------------------------------------------------------------
+// hash - Simple hash function for password storage
+// Uses a custom hash based on djb2 + salt for password hashing.
+// Not cryptographic-grade but sufficient for educational project.
+// ---------------------------------------------------------------------------
+
+module hash;
+
+import ../lib/std/main;
+
+// ---------------------------------------------------------------------------
+// DJB2 hash - produces a numeric hash of a string
+// ---------------------------------------------------------------------------
+
+fn djb2_hash(s: str) -> i64 {
+    let hash: i64 = 5381;
+    let i: i32 = 0;
+    while (i < len(s)) {
+        let c: i64 = s[i] & 255;
+        hash = hash * 33 + c;
+        i = i + 1;
+    }
+    return hash;
+}
+
+// ---------------------------------------------------------------------------
+// Generate a salt from a username (deterministic but unique per user)
+// ---------------------------------------------------------------------------
+
+fn make_salt(username: str) -> str {
+    let h: i64 = djb2_hash("bmc_salt_" + username + "_pepper");
+    if (h < 0) { h = 0 - h; }
+    return i64_to_str(h);
+}
+
+// ---------------------------------------------------------------------------
+// Hash a password with salt
+// Multiple rounds to make it harder to reverse
+// ---------------------------------------------------------------------------
+
+fn hash_password(password: str, salt: str) -> str {
+    let combined: str = salt + ":" + password + ":bmc2024";
+    let h1: i64 = djb2_hash(combined);
+    if (h1 < 0) { h1 = 0 - h1; }
+
+    let round2: str = i64_to_str(h1) + ":" + password + ":" + salt;
+    let h2: i64 = djb2_hash(round2);
+    if (h2 < 0) { h2 = 0 - h2; }
+
+    let round3: str = i64_to_str(h2) + ":" + salt + ":" + i64_to_str(h1);
+    let h3: i64 = djb2_hash(round3);
+    if (h3 < 0) { h3 = 0 - h3; }
+
+    return i64_to_str(h1) + "_" + i64_to_str(h2) + "_" + i64_to_str(h3);
+}
+
+// ---------------------------------------------------------------------------
+// Verify a password against a stored hash
+// ---------------------------------------------------------------------------
+
+fn verify_password(password: str, salt: str, stored_hash: str) -> bool {
+    let computed: str = hash_password(password, salt);
+    return computed == stored_hash;
+}
+
+// ---------------------------------------------------------------------------
+// Generate a session token from username + timestamp
+// ---------------------------------------------------------------------------
+
+fn generate_session_token(username: str, timestamp: str) -> str {
+    let data: str = username + ":" + timestamp + ":bmc_session";
+    let h: i64 = djb2_hash(data);
+    if (h < 0) { h = 0 - h; }
+    let h2: i64 = djb2_hash(i64_to_str(h) + ":verify");
+    if (h2 < 0) { h2 = 0 - h2; }
+    return i64_to_str(h) + "x" + i64_to_str(h2);
+}
