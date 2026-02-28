@@ -119,9 +119,9 @@ fn vm_get_memory_str(state: str) -> str { return vm_get_field(state, 7); }
 fn vm_get_inst_count(state: str) -> i32 { return str_to_i32(vm_get_field(state, 8)); }
 fn vm_get_opcodes(state: str) -> str { return vm_get_field(state, 9); }
 fn vm_get_operands(state: str) -> str { return vm_get_field(state, 10); }
-fn vm_get_output(state: str) -> str { return vm_get_field(state, 11); }
-fn vm_get_input(state: str) -> str { return vm_get_field(state, 12); }
-fn vm_get_error(state: str) -> str { return vm_get_field(state, 13); }
+fn vm_get_output(state: str) -> str { return str_replace(vm_get_field(state, 11), "%%PIPE%%", "|"); }
+fn vm_get_input(state: str) -> str { return str_replace(vm_get_field(state, 12), "%%PIPE%%", "|"); }
+fn vm_get_error(state: str) -> str { return str_replace(vm_get_field(state, 13), "%%PIPE%%", "|"); }
 
 // ---------------------------------------------------------------------------
 // Set a field in the VM state
@@ -325,8 +325,9 @@ fn vm_step(state: str) -> str {
         if (len(output) > 0) { output = output + "\n"; }
         output = output + i32_to_str(acc);
     } else if (opcode == OP_OTC()) {
-        let ch: str = " ";
+        let ch: str = make_buffer(2);
         ch[0] = acc % 256;
+        ch[1] = 0;
         output = output + ch;
     } else if (opcode == OP_HLT()) {
         halted = 1;
@@ -357,6 +358,11 @@ fn vm_step(state: str) -> str {
 
     let sr: i32 = calc_sr(acc);
 
+    // Escape pipe chars in output/input/error to avoid corrupting state format
+    let safe_output: str = str_replace(output, "|", "%%PIPE%%");
+    let safe_input: str = str_replace(input_buf, "|", "%%PIPE%%");
+    let safe_error: str = str_replace(error, "|", "%%PIPE%%");
+
     // Rebuild state
     let new_state: str = i32_to_str(acc) + "|" +
                           i32_to_str(new_pc) + "|" +
@@ -369,9 +375,9 @@ fn vm_step(state: str) -> str {
                           i32_to_str(inst_count) + "|" +
                           opcodes_str + "|" +
                           operands_str + "|" +
-                          output + "|" +
-                          input_buf + "|" +
-                          error;
+                          safe_output + "|" +
+                          safe_input + "|" +
+                          safe_error;
     return new_state;
 }
 
@@ -443,8 +449,8 @@ fn vm_provide_input(state: str, value: str) -> str {
     } else {
         current_input = value;
     }
-    // Set input and clear WAITING_INPUT error
-    state = vm_set_field(state, 12, current_input);
+    // Escape pipe chars before storing
+    state = vm_set_field(state, 12, str_replace(current_input, "|", "%%PIPE%%"));
     let error: str = vm_get_error(state);
     if (error == "WAITING_INPUT") {
         state = vm_set_field(state, 13, "");

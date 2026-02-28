@@ -226,6 +226,65 @@ RESP=$(curl -s "$BASE/api/me" -b /tmp/bmc_test_cookies.txt)
 check_contains "Not authenticated after logout" '"ok":false' "$RESP"
 sleep 0.5
 
+# ==========================================================================
+echo ""
+echo -e "${YELLOW}=== Instruction Tests ===${NC}"
+
+# Helper to load+run a program and extract output
+run_prog() {
+    local code="$1"
+    local sid
+    RESP=$(curl -s -X POST "$BASE/api/load" -H "Content-Type: application/json" -d "{\"code\":\"$code\"}")
+    sid=$(echo "$RESP" | grep -o '"session_id":"[^"]*"' | cut -d'"' -f4)
+    RESP=$(curl -s -X POST "$BASE/api/run" -H "Content-Type: application/json" -d "{\"session_id\":\"$sid\"}")
+    echo "$RESP"
+}
+
+# MUL
+RESP=$(run_prog "LDA 4\nMUL 5\nOUT\nHLT\nDAT 3\nDAT 4")
+check_contains "MUL 3*4=12" '"output":"12"' "$RESP"
+sleep 0.3
+
+# DIV
+RESP=$(run_prog "LDA 4\nDIV 5\nOUT\nHLT\nDAT 10\nDAT 3")
+check_contains "DIV 10/3=3" '"output":"3"' "$RESP"
+sleep 0.3
+
+# MOD
+RESP=$(run_prog "LDA 4\nMOD 5\nOUT\nHLT\nDAT 10\nDAT 3")
+check_contains "MOD 10%3=1" '"output":"1"' "$RESP"
+sleep 0.3
+
+# OTC (character output)
+RESP=$(run_prog "LDA 5\nOTC\nLDA 6\nOTC\nHLT\nDAT 72\nDAT 73")
+check_contains "OTC outputs HI" '"output":"HI"' "$RESP"
+sleep 0.3
+
+# BRA (unconditional branch)
+RESP=$(run_prog "LDA 5\nBRA 3\nOUT\nOUT\nHLT\nDAT 42")
+check_contains "BRA skips instruction" '"output":"42"' "$RESP"
+sleep 0.3
+
+# BRZ (branch if zero)
+RESP=$(run_prog "LDA 7\nBRZ 4\nOUT\nHLT\nLDA 8\nOUT\nHLT\nDAT 0\nDAT 99")
+check_contains "BRZ branches when zero" '"output":"99"' "$RESP"
+sleep 0.3
+
+# AND (bitwise)
+RESP=$(run_prog "LDA 4\nAND 5\nOUT\nHLT\nDAT 12\nDAT 10")
+check_contains "AND 12&10=8" '"output":"8"' "$RESP"
+sleep 0.3
+
+# OR (bitwise)
+RESP=$(run_prog "LDA 4\nOR 5\nOUT\nHLT\nDAT 12\nDAT 10")
+check_contains "OR 12|10=14" '"output":"14"' "$RESP"
+sleep 0.3
+
+# NOT
+RESP=$(run_prog "LDA 4\nNOT\nOUT\nHLT\nDAT 100")
+check_contains "NOT 100=899" '"output":"899"' "$RESP"
+sleep 0.3
+
 echo ""
 echo -e "${YELLOW}=== Results ===${NC}"
 echo -e "  Total: $TOTAL"

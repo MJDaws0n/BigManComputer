@@ -211,6 +211,7 @@ fn print_banner() -> void {
     print("  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝");
     print("  Big Man Computer v" + get_bmc_version());
     print("  An LMC-inspired CPU simulator");
+    print("  Built in Novus, by MJDawson");
     print("");
 }
 

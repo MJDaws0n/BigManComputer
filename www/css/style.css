@@ -669,6 +669,8 @@ h3 { font-size: 1.25rem; }
     border-right: 1px solid var(--border);
     user-select: none;
     min-width: 3rem;
+    white-space: pre;
+    overflow-y: hidden;
 }
 .code-input {
     flex: 1;

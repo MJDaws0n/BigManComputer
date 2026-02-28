@@ -91,12 +91,21 @@ kill %1
 | 37 | Delete program | POST name="test_program" | `ok: true` | ✓ Pass |
 | 38 | Logout | POST /api/logout | `ok: true` | ✓ Pass |
 | 39 | Post-logout check | GET /api/me | `ok: false` | ✓ Pass |
+| 40 | MUL 3×4 | LDA/MUL/OUT/HLT + DAT 3, DAT 4 | output: "12" | ✓ Pass |
+| 41 | DIV 10÷3 | LDA/DIV/OUT/HLT + DAT 10, DAT 3 | output: "3" | ✓ Pass |
+| 42 | MOD 10%3 | LDA/MOD/OUT/HLT + DAT 10, DAT 3 | output: "1" | ✓ Pass |
+| 43 | OTC (char output) | LDA/OTC × 2 + DAT 72, DAT 73 | output: "HI" | ✓ Pass |
+| 44 | BRA (unconditional) | LDA/BRA/OUT/OUT/HLT + DAT 42 | output: "42" | ✓ Pass |
+| 45 | BRZ (branch zero) | LDA/BRZ/HLT/LDA/OUT/HLT + DAT 0, DAT 99 | output: "99" | ✓ Pass |
+| 46 | AND 12&10 | LDA/AND/OUT/HLT + DAT 12, DAT 10 | output: "8" | ✓ Pass |
+| 47 | OR 12\|10 | LDA/OR/OUT/HLT + DAT 12, DAT 10 | output: "14" | ✓ Pass |
+| 48 | NOT 100 | LDA/NOT/OUT/HLT + DAT 100 | output: "899" | ✓ Pass |
 
 ## BMC Instruction Test Coverage
 
 | Instruction | Tested | Method |
 |-------------|--------|--------|
-| LDA | ✓ | Countdown program |
+| LDA | ✓ | Countdown program, all instruction tests |
 | STA | ✓ | Add-two-numbers program |
 | ADD | ✓ | Add-two-numbers (42+8=50) |
 | SUB | ✓ | Countdown program |
@@ -105,12 +114,12 @@ kill %1
 | HLT | ✓ | All programs |
 | BRP | ✓ | Countdown loop |
 | DAT | ✓ | Countdown data values |
-| MUL | - | Not directly tested |
-| DIV | - | Not directly tested |
-| MOD | - | Not directly tested |
-| BRA | - | Not directly tested |
-| BRZ | - | Not directly tested |
-| OTC | - | Not directly tested |
-| AND | - | Not directly tested |
-| OR | - | Not directly tested |
-| NOT | - | Not directly tested |
+| MUL | ✓ | Test 40: 3×4=12 |
+| DIV | ✓ | Test 41: 10÷3=3 |
+| MOD | ✓ | Test 42: 10%3=1 |
+| BRA | ✓ | Test 44: unconditional branch |
+| BRZ | ✓ | Test 45: branch when zero |
+| OTC | ✓ | Test 43: ASCII 72,73 → "HI" |
+| AND | ✓ | Test 46: 12&10=8 |
+| OR  | ✓ | Test 47: 12\|10=14 |
+| NOT | ✓ | Test 48: 999-100=899 |
