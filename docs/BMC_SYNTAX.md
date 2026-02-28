@@ -152,7 +152,7 @@ i:      DAT 73      ; ASCII 'I'
         LDA one     ; a = 1
         STA a
         LDA zero    ; b = 0
-        STA b
+        STA bh
         LDA ten     ; counter = 10
         STA count
 loop:   LDA a       ; Output a

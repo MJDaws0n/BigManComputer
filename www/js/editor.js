@@ -246,7 +246,7 @@ function setupExport() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'bmc_program';
+                    a.download = 'bmc_program.bmc';
                     a.click();
                     URL.revokeObjectURL(url);
                 } else {
@@ -277,7 +277,7 @@ function setupExport() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'bmc_program.nov';
+                    a.download = 'bmc_program.bmc';
                     a.click();
                     URL.revokeObjectURL(url);
                 } else {

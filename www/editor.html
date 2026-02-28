@@ -39,7 +39,7 @@
                 <button class="btn btn-ghost btn-sm" id="btn-export" title="Export as executable">📦 Export</button>
                 <button class="btn btn-ghost btn-sm" id="btn-export-src" title="Export Novus source">📄 Source</button>
                 <div class="toolbar-sep"></div>
-                <select id="example-select" style="background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-xs);padding:0.3rem 0.5rem;font-size:0.8rem;outline:none;cursor:pointer;">
+                <select id="example-select" class="toolbar-select">
                     <option value="">Load Example...</option>
                     <option value="add">Add Two Numbers</option>
                     <option value="countdown">Countdown</option>
@@ -151,16 +151,16 @@
     </div>
 
     <!-- Save Dialog -->
-    <div id="save-dialog" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:500;display:none;align-items:center;justify-content:center;">
+    <div id="save-dialog" class="modal-overlay" style="display:none;">
         <div class="form-card" style="max-width:400px;width:90%;">
-            <h3 style="margin-bottom:1rem;">Save Program</h3>
+            <h3 style="margin-bottom:1rem;">💾 Save Program</h3>
             <div class="form-group">
                 <label for="save-name">Program Name</label>
                 <input type="text" id="save-name" placeholder="My Program">
             </div>
-            <div style="display:flex;gap:0.5rem;">
-                <button class="btn btn-primary btn-sm" id="btn-save-confirm">Save</button>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
                 <button class="btn btn-outline btn-sm" id="btn-save-cancel">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btn-save-confirm">Save</button>
             </div>
         </div>
     </div>

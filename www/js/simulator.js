@@ -7,6 +7,7 @@ let vmState = null;
 let stepCount = 0;
 let isRunning = false;
 let runInterval = null;
+let wasRunningBeforeInput = false;
 
 const OPCODE_NAMES = {
     1: 'LDA', 2: 'STA', 3: 'ADD', 4: 'SUB', 5: 'MUL', 6: 'DIV', 7: 'MOD',
@@ -118,6 +119,7 @@ async function stepProgram() {
                 enableControls(false);
                 stopRunning();
             } else if (data.waiting_input) {
+                wasRunningBeforeInput = isRunning;
                 setStatus('waiting', '⏸ Waiting for input');
                 addLog('Step ' + stepCount + ': INP — Waiting for input');
                 showInputBar(true);
@@ -202,7 +204,7 @@ async function sendInput() {
         const res = await fetch('/api/input', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ session_id: sessionId, value: parseInt(value) || 0 })
+            body: JSON.stringify({ session_id: sessionId, value: String(parseInt(value) || 0) })
         });
         const data = await res.json();
         if (data.ok) {
@@ -213,6 +215,12 @@ async function sendInput() {
             appendInputDisplay(value);
             showInputBar(false);
             setStatus('ready', '● Step ' + stepCount);
+
+            // Resume running if we were in run mode
+            if (wasRunningBeforeInput) {
+                wasRunningBeforeInput = false;
+                startRunning();
+            }
         }
     } catch(e) {
         addLog('ERROR: Input failed');
