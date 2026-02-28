@@ -30,6 +30,25 @@
                 <button class="btn btn-primary btn-sm" id="btn-load" title="Load program into simulator">▶ Load</button>
                 <button class="btn btn-outline btn-sm" id="btn-step" title="Execute one instruction" disabled>⏭ Step</button>
                 <button class="btn btn-outline btn-sm" id="btn-run" title="Run to completion" disabled>⏩ Run</button>
+                <div class="custom-dropdown clock-dropdown" id="clock-speed-dropdown">
+                    <button class="dropdown-toggle" type="button">
+                        <span class="dropdown-text">1x</span>
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item" data-value="0.25">0.25x (Very Slow)</div>
+                        <div class="dropdown-item" data-value="0.5">0.5x (Slow)</div>
+                        <div class="dropdown-item active" data-value="1">1x (Normal)</div>
+                        <div class="dropdown-item" data-value="2">2x</div>
+                        <div class="dropdown-item" data-value="5">5x</div>
+                        <div class="dropdown-item" data-value="10">10x</div>
+                        <div class="dropdown-item" data-value="25">25x</div>
+                        <div class="dropdown-item" data-value="50">50x</div>
+                        <div class="dropdown-item" data-value="100">100x</div>
+                        <div class="dropdown-item" data-value="250">250x</div>
+                        <div class="dropdown-item" data-value="500">500x (Max)</div>
+                    </div>
+                </div>
                 <button class="btn btn-outline btn-sm" id="btn-reset" title="Reset simulator" disabled>↺ Reset</button>
                 <div class="toolbar-sep"></div>
                 <span class="toolbar-status status-ready" id="status-indicator">● Ready</span>
@@ -38,6 +57,7 @@
                 <button class="btn btn-ghost btn-sm" id="btn-save" title="Save program (requires login)">💾 Save</button>
                 <button class="btn btn-ghost btn-sm" id="btn-export" title="Export as executable">📦 Export</button>
                 <button class="btn btn-ghost btn-sm" id="btn-export-src" title="Export Novus source">📄 Source</button>
+                <button class="btn btn-ghost btn-sm" id="btn-export-asm" title="Download assembly source">🔩 Assembly</button>
                 <div class="toolbar-sep"></div>
                 <div class="custom-dropdown" id="example-dropdown">
                     <button class="dropdown-toggle" type="button">
@@ -64,8 +84,7 @@
             <div class="editor-container">
                 <div class="line-numbers" id="line-numbers">1</div>
                 <textarea class="code-input" id="code-input" spellcheck="false" placeholder="; Write your BMC assembly here...
-; Try: INP, OUT, ADD, SUB, HLT
-; Use /help for the full instruction set"></textarea>
+; Try: INP, OUT, ADD, SUB, HLT"></textarea>
             </div>
         </div>
 
@@ -156,31 +175,68 @@
     </div>
 
     <!-- Save Dialog -->
-    <div id="save-dialog" class="modal-overlay" style="display:none;">
-        <div class="form-card" style="max-width:420px;width:90%;">
-            <h3 style="margin-bottom:1rem;">💾 Save Program</h3>
-            <div class="form-group">
-                <label for="save-name">Program Name</label>
-                <input type="text" id="save-name" placeholder="Enter a name or pick from below...">
-            </div>
-            <div class="form-group" id="save-existing-group" style="display:none;">
-                <label>Or overwrite an existing program</label>
-                <div class="custom-dropdown" id="save-existing-dropdown">
-                    <button class="dropdown-toggle" type="button">
-                        <span class="dropdown-text">Select existing program...</span>
-                        <span class="dropdown-arrow">▾</span>
-                    </button>
-                    <div class="dropdown-menu" id="save-existing-menu"></div>
+    <div id="save-dialog" class="bmc-modal-overlay" style="display:none;">
+        <div class="bmc-modal save-modal">
+            <div class="bmc-modal-icon">💾</div>
+            <div class="save-modal-title">Save Program</div>
+            <div class="save-modal-body">
+                <div class="form-group">
+                    <label for="save-name">Program Name</label>
+                    <input type="text" id="save-name" class="save-name-input" placeholder="Enter a program name...">
+                </div>
+                <div class="save-existing-section" id="save-existing-group" style="display:none;">
+                    <div class="save-divider"><span>or overwrite existing</span></div>
+                    <div class="custom-dropdown save-existing-dd" id="save-existing-dropdown">
+                        <button class="dropdown-toggle" type="button">
+                            <span class="dropdown-text">Select existing program...</span>
+                            <span class="dropdown-arrow">▾</span>
+                        </button>
+                        <div class="dropdown-menu" id="save-existing-menu"></div>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+            <div class="bmc-modal-actions">
                 <button class="btn btn-outline btn-sm" id="btn-save-cancel">Cancel</button>
                 <button class="btn btn-primary btn-sm" id="btn-save-confirm">Save</button>
             </div>
         </div>
     </div>
 
+    <!-- Assembly Export Dialog -->
+    <div id="asm-dialog" class="bmc-modal-overlay" style="display:none;">
+        <div class="bmc-modal asm-modal">
+            <div class="bmc-modal-icon">🔩</div>
+            <div class="save-modal-title">Download Assembly</div>
+            <div class="save-modal-body">
+                <div class="form-group">
+                    <label>Target Architecture</label>
+                    <div class="custom-dropdown asm-arch-dd" id="asm-arch-dropdown">
+                        <button class="dropdown-toggle" type="button">
+                            <span class="dropdown-text">ARM64 / Apple Silicon (macOS)</span>
+                            <span class="dropdown-arrow">▾</span>
+                        </button>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-item active" data-value="arm64-macos">ARM64 / Apple Silicon (macOS)</div>
+                            <div class="dropdown-item" data-value="arm64-linux">ARM64 / AArch64 (Linux)</div>
+                            <div class="dropdown-item" data-value="x86_64-linux">x86_64 / AMD64 (Linux)</div>
+                            <div class="dropdown-item" data-value="x86_64-macos">x86_64 / Intel (macOS)</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="asm-preview-wrap" class="asm-preview-wrap" style="display:none;">
+                    <label>Preview</label>
+                    <pre class="asm-preview" id="asm-preview"></pre>
+                </div>
+            </div>
+            <div class="bmc-modal-actions">
+                <button class="btn btn-outline btn-sm" id="btn-asm-cancel">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="btn-asm-download">⬇ Download .s</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/app.js"></script>
+    <script src="/js/asmgen.js"></script>
     <script src="/js/editor.js"></script>
     <script src="/js/simulator.js"></script>
 </body>

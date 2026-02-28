@@ -9,6 +9,8 @@ let isRunning = false;
 let runInterval = null;
 let wasRunningBeforeInput = false;
 let lastOutputLen = 0;
+let clockMultiplier = 1;
+const BASE_INTERVAL = 300; // ms at 1x speed
 
 const OPCODE_NAMES = {
     1: 'LDA', 2: 'STA', 3: 'ADD', 4: 'SUB', 5: 'MUL', 6: 'DIV', 7: 'MOD',
@@ -51,6 +53,22 @@ function setupControls() {
     if (inputField) {
         inputField.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') sendInput();
+        });
+    }
+
+    // Clock speed dropdown
+    const clockDropdown = document.getElementById('clock-speed-dropdown');
+    if (clockDropdown) {
+        clockDropdown.addEventListener('dropdown-change', (e) => {
+            const val = parseFloat(e.detail.value);
+            if (val > 0) {
+                clockMultiplier = val;
+                // If currently running, restart interval with new speed
+                if (isRunning) {
+                    stopRunning();
+                    startRunning();
+                }
+            }
         });
     }
 }
@@ -156,10 +174,11 @@ function startRunning() {
     if (btn) { btn.textContent = '⏸ Pause'; }
     setStatus('running', '▶ Running');
 
+    const interval = Math.max(1, Math.round(BASE_INTERVAL / clockMultiplier));
     runInterval = setInterval(async () => {
         if (!isRunning) return;
         await stepProgram();
-    }, 300);
+    }, interval);
 }
 
 function stopRunning() {

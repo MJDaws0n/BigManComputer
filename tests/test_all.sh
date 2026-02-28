@@ -101,6 +101,9 @@ sleep 0.5
 echo ""
 echo -e "${YELLOW}=== Auth API ===${NC}"
 
+# Use a unique test username to avoid conflict with real user data
+TEST_USER="testuser_$$"
+
 RESP=$(curl -s "$BASE/api/me")
 check_contains "GET /api/me (no auth) returns ok:false" '"ok":false' "$RESP"
 sleep 0.5
@@ -109,24 +112,24 @@ RESP=$(curl -s -X POST "$BASE/api/signup" -H "Content-Type: application/json" -d
 check_contains "Signup with short username fails" '"ok":false' "$RESP"
 sleep 0.5
 
-RESP=$(curl -s -X POST "$BASE/api/signup" -H "Content-Type: application/json" -d '{"username":"testuser","password":"password123"}')
+RESP=$(curl -s -X POST "$BASE/api/signup" -H "Content-Type: application/json" -d "{\"username\":\"$TEST_USER\",\"password\":\"password123\"}")
 check_contains "Signup with valid credentials succeeds" '"ok":true' "$RESP"
 sleep 0.5
 
-RESP=$(curl -s -X POST "$BASE/api/signup" -H "Content-Type: application/json" -d '{"username":"testuser","password":"password123"}')
+RESP=$(curl -s -X POST "$BASE/api/signup" -H "Content-Type: application/json" -d "{\"username\":\"$TEST_USER\",\"password\":\"password123\"}")
 check_contains "Duplicate signup fails" '"ok":false' "$RESP"
 sleep 0.5
 
-RESP=$(curl -s -X POST "$BASE/api/login" -H "Content-Type: application/json" -d '{"username":"testuser","password":"wrongpass"}')
+RESP=$(curl -s -X POST "$BASE/api/login" -H "Content-Type: application/json" -d "{\"username\":\"$TEST_USER\",\"password\":\"wrongpass\"}")
 check_contains "Login with wrong password fails" '"ok":false' "$RESP"
 sleep 0.5
 
-RESP=$(curl -s -X POST "$BASE/api/login" -H "Content-Type: application/json" -d '{"username":"testuser","password":"password123"}' -c /tmp/bmc_test_cookies.txt)
+RESP=$(curl -s -X POST "$BASE/api/login" -H "Content-Type: application/json" -d "{\"username\":\"$TEST_USER\",\"password\":\"password123\"}" -c /tmp/bmc_test_cookies.txt)
 check_contains "Login with correct password succeeds" '"ok":true' "$RESP"
 sleep 0.5
 
 RESP=$(curl -s "$BASE/api/me" -b /tmp/bmc_test_cookies.txt)
-check_contains "GET /api/me (authed) returns username" '"username":"testuser"' "$RESP"
+check_contains "GET /api/me (authed) returns username" "\"username\":\"$TEST_USER\"" "$RESP"
 sleep 0.5
 
 echo ""
@@ -209,7 +212,7 @@ sleep 0.5
 
 # Test: GDPR data export
 RESP=$(curl -s "$BASE/api/export-data" -b /tmp/bmc_test_cookies.txt)
-check_contains "GDPR data export returns username" '"testuser"' "$RESP"
+check_contains "GDPR data export returns username" "\"$TEST_USER\"" "$RESP"
 sleep 0.5
 
 # Cleanup: Delete program
@@ -218,6 +221,13 @@ check_contains "Delete program succeeds" '"ok":true' "$RESP"
 sleep 0.5
 
 # Logout
+# First log back in to clean up test user account
+curl -s -X POST "$BASE/api/login" -H "Content-Type: application/json" -d "{\"username\":\"$TEST_USER\",\"password\":\"password123\"}" -c /tmp/bmc_test_cookies.txt > /dev/null
+sleep 0.3
+# Delete test account (GDPR)
+curl -s -X DELETE "$BASE/api/account" -b /tmp/bmc_test_cookies.txt > /dev/null
+sleep 0.3
+
 RESP=$(curl -s -X POST "$BASE/api/logout" -b /tmp/bmc_test_cookies.txt -c /tmp/bmc_test_cookies.txt)
 check_contains "Logout succeeds" '"ok":true' "$RESP"
 sleep 0.5

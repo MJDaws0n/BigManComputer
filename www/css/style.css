@@ -719,6 +719,22 @@ html.editor-active .navbar {
 }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 0.5rem; }
 .toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 0.25rem; }
+.clock-dropdown { display: inline-block; }
+.clock-dropdown .dropdown-toggle {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 600;
+    gap: 0.25rem;
+}
+.clock-dropdown .dropdown-toggle:hover { border-color: var(--accent); }
+.clock-dropdown .dropdown-menu { min-width: 160px; }
+.clock-dropdown .dropdown-item.active { color: var(--accent); font-weight: 600; }
 .toolbar-status {
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -1166,6 +1182,110 @@ html.editor-active .navbar {
     display: flex;
     gap: 0.5rem;
     justify-content: center;
+}
+
+/* Save dialog specific */
+.save-modal { max-width: 440px; text-align: left; }
+.save-modal .bmc-modal-icon { text-align: center; }
+.save-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+.save-modal-body { margin-bottom: 1.25rem; }
+.save-modal-body .form-group { margin-bottom: 0.75rem; }
+.save-modal-body label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.save-name-input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-family: var(--font-mono);
+    transition: border-color var(--transition);
+    box-sizing: border-box;
+}
+.save-name-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.save-name-input::placeholder { color: var(--text-muted); }
+.save-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.save-divider::before, .save-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+.save-existing-dd { display: block; width: 100%; }
+.save-existing-dd .dropdown-toggle {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    border-radius: var(--radius-xs);
+}
+.save-existing-dd .dropdown-menu {
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.save-modal .bmc-modal-actions { justify-content: flex-end; margin-top: 0; }
+
+/* Assembly export modal */
+.asm-modal { max-width: 700px; text-align: left; }
+.asm-modal .bmc-modal-icon { text-align: center; }
+.asm-modal .bmc-modal-actions { justify-content: flex-end; margin-top: 0; }
+.asm-arch-dd { display: block; width: 100%; }
+.asm-arch-dd .dropdown-toggle {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+}
+.asm-arch-dd .dropdown-menu { left: 0; right: 0; }
+.asm-preview-wrap { margin-top: 1rem; }
+.asm-preview-wrap label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.asm-preview {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 0.75rem;
+    max-height: 320px;
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre;
+    margin: 0;
 }
 
 /* --- Custom Dropdown (replaces native select) --- */

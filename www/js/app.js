@@ -56,26 +56,46 @@ function initCustomDropdowns() {
         const menu = dd.querySelector('.dropdown-menu');
         if (!toggle || !menu) return;
 
+        // Sync toggle label from active item (useful for preselected defaults)
+        const active = menu.querySelector('.dropdown-item.active');
+        if (active) {
+            const textEl = toggle.querySelector('.dropdown-text');
+            if (textEl) textEl.textContent = active.textContent;
+        }
+
+        if (dd._bmcInit) return; // prevent duplicate binding
+        dd._bmcInit = true;
+
         toggle.addEventListener('click', e => {
             e.stopPropagation();
             document.querySelectorAll('.custom-dropdown.open').forEach(d => { if (d !== dd) d.classList.remove('open'); });
             dd.classList.toggle('open');
         });
 
-        menu.querySelectorAll('.dropdown-item').forEach(item => {
-            item.addEventListener('click', () => {
-                dd.classList.remove('open');
-                const val = item.dataset.value;
-                const text = item.textContent;
-                toggle.querySelector('.dropdown-text').textContent = text;
-                dd.dispatchEvent(new CustomEvent('change', { detail: { value: val } }));
-            });
+        // Use event delegation so dynamically added items work
+        menu.addEventListener('click', e => {
+            const item = e.target.closest('.dropdown-item');
+            if (!item) return;
+
+            // Mark selected item
+            menu.querySelectorAll('.dropdown-item.active').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            dd.classList.remove('open');
+            const val = item.dataset.value;
+            const text = item.textContent;
+            const textEl = toggle.querySelector('.dropdown-text');
+            if (textEl) textEl.textContent = text;
+            dd.dispatchEvent(new CustomEvent('dropdown-change', { detail: { value: val } }));
         });
     });
 
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.custom-dropdown.open').forEach(d => d.classList.remove('open'));
-    });
+    if (!document._bmcDropdownDocInit) {
+        document._bmcDropdownDocInit = true;
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.custom-dropdown.open').forEach(d => d.classList.remove('open'));
+        });
+    }
 }
 
 // ---- Auth & Nav ----

@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Example selector (custom dropdown)
     const exDropdown = document.getElementById('example-dropdown');
     if (exDropdown) {
-        exDropdown.addEventListener('change', (e) => {
+        exDropdown.addEventListener('dropdown-change', (e) => {
             const val = e.detail.value;
             if (val && EXAMPLES[val]) {
                 codeInput.value = EXAMPLES[val];
@@ -250,7 +250,10 @@ function setupSave() {
             if (existText) existText.textContent = 'Select existing program...';
 
             await loadUserPrograms();
-            if (dialog) dialog.style.display = 'flex';
+            if (dialog) {
+                dialog.style.display = 'flex';
+                requestAnimationFrame(() => dialog.classList.add('visible'));
+            }
         });
     }
 
@@ -280,7 +283,7 @@ function setupSave() {
                 });
                 const data = await res.json();
                 if (data.ok) {
-                    if (dialog) dialog.style.display = 'none';
+                    if (dialog) { dialog.classList.remove('visible'); setTimeout(() => dialog.style.display = 'none', 200); }
                     bmcAlert('Program saved!', 'success');
                 } else {
                     bmcAlert(data.error || 'Failed to save', 'error');
@@ -293,7 +296,7 @@ function setupSave() {
 
     if (btnCancel) {
         btnCancel.addEventListener('click', () => {
-            if (dialog) dialog.style.display = 'none';
+            if (dialog) { dialog.classList.remove('visible'); setTimeout(() => dialog.style.display = 'none', 200); }
         });
     }
 }
@@ -364,7 +367,75 @@ function setupExport() {
     }
 }
 
+// Assembly export functionality
+function setupAsmExport() {
+    const btnAsm = document.getElementById('btn-export-asm');
+    const dialog = document.getElementById('asm-dialog');
+    const btnCancel = document.getElementById('btn-asm-cancel');
+    const btnDownload = document.getElementById('btn-asm-download');
+    const preview = document.getElementById('asm-preview');
+    const previewWrap = document.getElementById('asm-preview-wrap');
+    const archDropdown = document.getElementById('asm-arch-dropdown');
+
+    let selectedArch = 'arm64-macos';
+    let currentAsm = '';
+
+    function generatePreview() {
+        const code = getCode();
+        if (!code.trim()) {
+            currentAsm = '; No code to generate assembly for.';
+        } else {
+            currentAsm = bmcToAsm(code, selectedArch);
+        }
+        if (preview) preview.textContent = currentAsm;
+        if (previewWrap) previewWrap.style.display = 'block';
+    }
+
+    if (archDropdown) {
+        archDropdown.addEventListener('dropdown-change', (e) => {
+            selectedArch = e.detail.value;
+            generatePreview();
+        });
+    }
+
+    if (btnAsm) {
+        btnAsm.addEventListener('click', () => {
+            const code = getCode();
+            if (!code.trim()) { bmcAlert('Write some code first!', 'warning'); return; }
+            generatePreview();
+            if (dialog) {
+                dialog.style.display = 'flex';
+                requestAnimationFrame(() => dialog.classList.add('visible'));
+            }
+            initCustomDropdowns();
+        });
+    }
+
+    if (btnDownload) {
+        btnDownload.addEventListener('click', () => {
+            if (!currentAsm) return;
+            const ext = selectedArch.replace(/-/g, '_');
+            const blob = new Blob([currentAsm], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'bmc_program_' + ext + '.s';
+            a.click();
+            URL.revokeObjectURL(url);
+            if (dialog) { dialog.classList.remove('visible'); setTimeout(() => dialog.style.display = 'none', 200); }
+            bmcAlert('Assembly downloaded!', 'success');
+        });
+    }
+
+    if (btnCancel) {
+        btnCancel.addEventListener('click', () => {
+            if (dialog) { dialog.classList.remove('visible'); setTimeout(() => dialog.style.display = 'none', 200); }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setupSave();
     setupExport();
+    setupAsmExport();
 });

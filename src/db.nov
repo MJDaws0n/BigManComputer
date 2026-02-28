@@ -22,6 +22,34 @@ fn db_init() -> void {
 }
 
 // ---------------------------------------------------------------------------
+// File locking for concurrent access safety (fork-per-request model)
+// Uses O_CREAT|O_EXCL for atomic lock file creation
+// ---------------------------------------------------------------------------
+
+fn db_lock(table: str) -> void {
+    let lock_path: str = "data/" + table + ".lock";
+    let attempts: i32 = 0;
+    while (attempts < 200) {
+        // O_WRONLY|O_CREAT|O_EXCL = 0x0001|0x0200|0x0800 = 2561
+        let fd: i32 = file_open(lock_path, 2561, 420);
+        if (fd >= 0) {
+            file_close(fd);
+            return;
+        }
+        sleep_ms(5);
+        attempts = attempts + 1;
+    }
+    // Timeout: stale lock? Force acquire.
+    file_delete(lock_path);
+    write_file(lock_path, "1");
+}
+
+fn db_unlock(table: str) -> void {
+    let lock_path: str = "data/" + table + ".lock";
+    file_delete(lock_path);
+}
+
+// ---------------------------------------------------------------------------
 // Get the file path for a table
 // ---------------------------------------------------------------------------
 
@@ -61,7 +89,9 @@ fn db_read_all(table: str) -> str {
 // ---------------------------------------------------------------------------
 
 fn db_append_row(table: str, row: str) -> void {
+    db_lock(table);
     file_append(db_table_path(table), row + "\n");
+    db_unlock(table);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +99,9 @@ fn db_append_row(table: str, row: str) -> void {
 // ---------------------------------------------------------------------------
 
 fn db_write_all(table: str, data: str) -> void {
+    db_lock(table);
     write_file(db_table_path(table), data);
+    db_unlock(table);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,8 +197,9 @@ fn db_get_field(row: str, field_index: i32) -> str {
 // ---------------------------------------------------------------------------
 
 fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
-    let data: str = db_read_all(table);
-    if (len(data) == 0) { return 0; }
+    db_lock(table);
+    let data: str = read_file(db_table_path(table));
+    if (len(data) == 0) { db_unlock(table); return 0; }
     let result: str = "";
     let deleted: i32 = 0;
     let start: i32 = 0;
@@ -187,7 +220,8 @@ fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
         }
         i = i + 1;
     }
-    db_write_all(table, result);
+    write_file(db_table_path(table), result);
+    db_unlock(table);
     return deleted;
 }
 
@@ -196,8 +230,9 @@ fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
 // ---------------------------------------------------------------------------
 
 fn db_update_field(table: str, match_field: i32, match_value: str, update_field: i32, new_value: str) -> i32 {
-    let data: str = db_read_all(table);
-    if (len(data) == 0) { return 0; }
+    db_lock(table);
+    let data: str = read_file(db_table_path(table));
+    if (len(data) == 0) { db_unlock(table); return 0; }
     let result: str = "";
     let updated: i32 = 0;
     let start: i32 = 0;
@@ -220,7 +255,8 @@ fn db_update_field(table: str, match_field: i32, match_value: str, update_field:
         }
         i = i + 1;
     }
-    db_write_all(table, result);
+    write_file(db_table_path(table), result);
+    db_unlock(table);
     return updated;
 }
 
