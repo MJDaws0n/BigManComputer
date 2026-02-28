@@ -60,7 +60,7 @@ function setupControls() {
 async function loadProgram() {
     const code = getCode();
     if (!code.trim()) {
-        alert('Write some code first!');
+        bmcAlert('Write some code first!', 'warning');
         return;
     }
 
@@ -86,7 +86,7 @@ async function loadProgram() {
         } else {
             setStatus('halted', '✖ Error');
             addLog('ERROR: ' + (data.error || 'Failed to load'));
-            alert('Parse error: ' + (data.error || 'Unknown error'));
+            bmcAlert('Parse error: ' + (data.error || 'Unknown error'), 'error');
         }
     } catch(e) {
         setStatus('halted', '✖ Error');

@@ -43,6 +43,9 @@ fn handle_save_program(request: str, client_fd: i32) -> void {
         return;
     }
 
+    let overwrite_str: str = json_get_value(body, "overwrite");
+    let overwrite: bool = (overwrite_str == "true");
+
     let timestamp: str = i64_to_str(get_time_s());
 
     // Check if program with this name exists for this user
@@ -62,6 +65,11 @@ fn handle_save_program(request: str, client_fd: i32) -> void {
             pstart = pi + 1;
         }
         pi = pi + 1;
+    }
+
+    if (found && !overwrite) {
+        api_send_json(client_fd, 409, "{\"ok\":false,\"error\":\"Program already exists\"}");
+        return;
     }
 
     if (found) {
@@ -88,8 +96,10 @@ fn handle_save_program(request: str, client_fd: i32) -> void {
         db_write_all("programs", result);
     }
 
-    // Escape pipe characters in code to prevent corruption
+    // Escape pipe characters and newlines in code to prevent DB corruption
     let safe_code: str = str_replace(code, "|", "%%PIPE%%");
+    safe_code = str_replace(safe_code, "\n", "%%NL%%");
+    safe_code = str_replace(safe_code, "\r", "%%CR%%");
     let safe_name: str = str_replace(name, "|", "_");
     let row: str = username + "|" + safe_name + "|" + safe_code + "|" + timestamp + "|" + timestamp;
     db_append_row("programs", row);
@@ -124,6 +134,8 @@ fn handle_list_programs(request: str, client_fd: i32) -> void {
                 let pcreated: str = db_get_field(prow, 3);
                 let pupdated: str = db_get_field(prow, 4);
                 let pcode: str = str_replace(db_get_field(prow, 2), "%%PIPE%%", "|");
+                pcode = str_replace(pcode, "%%NL%%", "\n");
+                pcode = str_replace(pcode, "%%CR%%", "\r");
                 json = json + "{\"name\":\"" + json_escape(pname) + "\",";
                 json = json + "\"code\":\"" + json_escape(pcode) + "\",";
                 json = json + "\"created_at\":\"" + pcreated + "\",";
@@ -172,8 +184,10 @@ fn handle_load_program(request: str, client_fd: i32, path: str) -> void {
                 let pname: str = db_get_field(prow, 1);
                 if (pname == name) {
                     let code: str = db_get_field(prow, 2);
-                    // Unescape pipe characters
+                    // Unescape stored characters
                     code = str_replace(code, "%%PIPE%%", "|");
+                    code = str_replace(code, "%%NL%%", "\n");
+                    code = str_replace(code, "%%CR%%", "\r");
                     let json: str = "{\"ok\":true,\"name\":\"" + json_escape(name) + "\",\"code\":\"" + json_escape(code) + "\"}";
                     api_send_json(client_fd, 200, json);
                     return;

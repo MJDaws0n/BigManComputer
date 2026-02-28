@@ -26,16 +26,27 @@
     <div class="dashboard">
         <div class="dashboard-header">
             <div>
-                <h1>Dashboard</h1>
-                <p style="color:var(--text-secondary);margin-top:0.25rem;">Welcome back, <strong id="dash-username">...</strong></p>
+                <h1>👋 Welcome back, <span id="dash-username" class="gradient-text">...</span></h1>
+                <p>Manage your BMC programs and account settings.</p>
             </div>
-            <div style="display:flex;gap:0.5rem;">
+            <div class="dashboard-actions">
                 <a href="/editor" class="btn btn-primary btn-sm">+ New Program</a>
-                <button class="btn btn-outline btn-sm" id="btn-export-data">📥 Export My Data</button>
-                <button class="btn btn-danger btn-sm" id="btn-delete-account">🗑 Delete Account</button>
                 <button class="btn btn-ghost btn-sm" id="btn-logout">Logout</button>
             </div>
         </div>
+
+        <div class="dashboard-stats" id="dash-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-programs">0</div>
+                <div class="stat-label">Programs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-lines">0</div>
+                <div class="stat-label">Lines Written</div>
+            </div>
+        </div>
+
+        <div class="programs-section-title">📂 Your Programs</div>
 
         <div id="programs-container">
             <div class="empty-state" id="empty-state" style="display:none;">
@@ -43,6 +54,12 @@
                 <p>Create your first BMC program in the <a href="/editor">Editor</a>!</p>
             </div>
             <div class="programs-grid" id="programs-grid"></div>
+        </div>
+
+        <div style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);display:flex;gap:0.75rem;align-items:center;">
+            <span style="color:var(--text-muted);font-size:0.85rem;">Account:</span>
+            <button class="btn btn-outline btn-sm" id="btn-export-data">📥 Export My Data</button>
+            <button class="btn btn-danger btn-sm" id="btn-delete-account">🗑 Delete Account</button>
         </div>
     </div>
 
@@ -109,18 +126,27 @@
                 if (!data.programs || data.programs.length === 0) {
                     empty.style.display = 'block';
                     grid.innerHTML = '';
+                    document.getElementById('stat-programs').textContent = '0';
+                    document.getElementById('stat-lines').textContent = '0';
                     return;
                 }
 
                 empty.style.display = 'none';
+                document.getElementById('stat-programs').textContent = data.programs.length;
+                let totalLines = 0;
+                data.programs.forEach(p => {
+                    if (p.code) totalLines += p.code.split('\n').length;
+                });
+                document.getElementById('stat-lines').textContent = totalLines;
+
                 grid.innerHTML = data.programs.map(p => `
                     <div class="program-card" onclick="openProgram('${escapeHtml(p.name)}')">
-                        <h3>${escapeHtml(p.name)}</h3>
+                        <h3>📄 ${escapeHtml(p.name)}</h3>
                         <div class="program-date">${p.updated_at || p.created_at || ''}</div>
-                        <div class="program-preview">${escapeHtml((p.code || '').substring(0, 120))}</div>
+                        <div class="program-preview">${escapeHtml((p.code || '').substring(0, 150))}</div>
                         <div class="program-card-actions">
-                            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openProgram('${escapeHtml(p.name)}')">Open</button>
-                            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteProgram('${escapeHtml(p.name)}')">Delete</button>
+                            <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openProgram('${escapeHtml(p.name)}')">✏️ Open</button>
+                            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();deleteProgram('${escapeHtml(p.name)}')">🗑 Delete</button>
                         </div>
                     </div>
                 `).join('');
@@ -134,7 +160,8 @@
         }
 
         async function deleteProgram(name) {
-            if (!confirm('Delete program "' + name + '"?')) return;
+            const ok = await bmcConfirm('Delete program "' + name + '"?');
+            if (!ok) return;
             try {
                 await fetch('/api/programs/delete', {
                     method: 'POST',
@@ -143,12 +170,8 @@
                 });
                 loadPrograms();
             } catch(e) {
-                alert('Failed to delete program');
+                bmcAlert('Failed to delete program', 'error');
             }
-        }
-
-        function escapeHtml(s) {
-            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
         // Logout
@@ -170,7 +193,7 @@
                 a.click();
                 URL.revokeObjectURL(url);
             } catch(e) {
-                alert('Failed to export data');
+                bmcAlert('Failed to export data', 'error');
             }
         });
 
@@ -185,20 +208,20 @@
         document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
             const input = document.getElementById('delete-confirm-input').value;
             if (input !== 'DELETE') {
-                alert('Please type DELETE to confirm.');
+                bmcAlert('Please type DELETE to confirm.', 'warning');
                 return;
             }
             try {
                 const res = await fetch('/api/account', { method: 'DELETE' });
                 const data = await res.json();
                 if (data.ok) {
-                    alert('Your account and all data have been permanently deleted.');
+                    await bmcAlert('Your account and all data have been permanently deleted.', 'info');
                     window.location.href = '/';
                 } else {
-                    alert(data.error || 'Failed to delete account');
+                    bmcAlert(data.error || 'Failed to delete account', 'error');
                 }
             } catch(e) {
-                alert('Failed to delete account');
+                bmcAlert('Failed to delete account', 'error');
             }
         });
 

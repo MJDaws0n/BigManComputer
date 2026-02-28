@@ -100,15 +100,18 @@ document.addEventListener('DOMContentLoaded', () => {
     codeInput.addEventListener('scroll', syncScroll);
     codeInput.addEventListener('keydown', handleTab);
 
-    // Example selector
-    const exSelect = document.getElementById('example-select');
-    if (exSelect) {
-        exSelect.addEventListener('change', (e) => {
-            if (e.target.value && EXAMPLES[e.target.value]) {
-                codeInput.value = EXAMPLES[e.target.value];
+    // Example selector (custom dropdown)
+    const exDropdown = document.getElementById('example-dropdown');
+    if (exDropdown) {
+        exDropdown.addEventListener('change', (e) => {
+            const val = e.detail.value;
+            if (val && EXAMPLES[val]) {
+                codeInput.value = EXAMPLES[val];
                 updateLineNumbers();
             }
-            e.target.value = '';
+            // Reset label
+            const toggle = exDropdown.querySelector('.dropdown-text');
+            if (toggle) setTimeout(() => { toggle.textContent = 'Load Example...'; }, 300);
         });
     }
 
@@ -186,7 +189,7 @@ function setupSave() {
         btnSave.addEventListener('click', async () => {
             const user = await checkAuthAndUpdateNav();
             if (!user) {
-                alert('Please log in to save programs.');
+                bmcAlert('Please log in to save programs.', 'warning');
                 window.location.href = '/login';
                 return;
             }
@@ -197,7 +200,7 @@ function setupSave() {
     if (btnConfirm) {
         btnConfirm.addEventListener('click', async () => {
             const name = document.getElementById('save-name').value.trim();
-            if (!name) { alert('Please enter a program name.'); return; }
+            if (!name) { bmcAlert('Please enter a program name.', 'warning'); return; }
             try {
                 const res = await fetch('/api/programs/save', {
                     method: 'POST',
@@ -207,12 +210,28 @@ function setupSave() {
                 const data = await res.json();
                 if (data.ok) {
                     if (dialog) dialog.style.display = 'none';
-                    alert('Program saved!');
+                    bmcAlert('Program saved!', 'success');
+                } else if (data.error === 'Program already exists') {
+                    const overwrite = await bmcConfirm('A program named "' + name + '" already exists. Overwrite it?');
+                    if (overwrite) {
+                        const res2 = await fetch('/api/programs/save', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ name, code: getCode(), overwrite: "true" })
+                        });
+                        const data2 = await res2.json();
+                        if (data2.ok) {
+                            if (dialog) dialog.style.display = 'none';
+                            bmcAlert('Program saved!', 'success');
+                        } else {
+                            bmcAlert(data2.error || 'Failed to save', 'error');
+                        }
+                    }
                 } else {
-                    alert(data.error || 'Failed to save');
+                    bmcAlert(data.error || 'Failed to save', 'error');
                 }
             } catch(e) {
-                alert('Failed to save program');
+                bmcAlert('Failed to save program', 'error');
             }
         });
     }
@@ -232,7 +251,7 @@ function setupExport() {
     if (btnExport) {
         btnExport.addEventListener('click', async () => {
             const code = getCode();
-            if (!code.trim()) { alert('No code to export.'); return; }
+            if (!code.trim()) { bmcAlert('No code to export.', 'warning'); return; }
             btnExport.disabled = true;
             btnExport.textContent = '⏳ Compiling...';
             try {
@@ -251,10 +270,10 @@ function setupExport() {
                     URL.revokeObjectURL(url);
                 } else {
                     const data = await res.json();
-                    alert(data.error || 'Export failed');
+                    bmcAlert(data.error || 'Export failed', 'error');
                 }
             } catch(e) {
-                alert('Export failed');
+                bmcAlert('Export failed', 'error');
             }
             btnExport.disabled = false;
             btnExport.textContent = '📦 Export';
@@ -264,7 +283,7 @@ function setupExport() {
     if (btnExportSrc) {
         btnExportSrc.addEventListener('click', async () => {
             const code = getCode();
-            if (!code.trim()) { alert('No code to export.'); return; }
+            if (!code.trim()) { bmcAlert('No code to export.', 'warning'); return; }
             try {
                 const res = await fetch('/api/export/source', {
                     method: 'POST',
@@ -281,10 +300,10 @@ function setupExport() {
                     a.click();
                     URL.revokeObjectURL(url);
                 } else {
-                    alert(data.error || 'Export failed');
+                    bmcAlert(data.error || 'Export failed', 'error');
                 }
             } catch(e) {
-                alert('Export failed');
+                bmcAlert('Export failed', 'error');
             }
         });
     }

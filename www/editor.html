@@ -39,14 +39,19 @@
                 <button class="btn btn-ghost btn-sm" id="btn-export" title="Export as executable">📦 Export</button>
                 <button class="btn btn-ghost btn-sm" id="btn-export-src" title="Export Novus source">📄 Source</button>
                 <div class="toolbar-sep"></div>
-                <select id="example-select" class="toolbar-select">
-                    <option value="">Load Example...</option>
-                    <option value="add">Add Two Numbers</option>
-                    <option value="countdown">Countdown</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="fibonacci">Fibonacci</option>
-                    <option value="echo">Echo Characters</option>
-                </select>
+                <div class="custom-dropdown" id="example-dropdown">
+                    <button class="dropdown-toggle" type="button">
+                        <span class="dropdown-text">Load Example...</span>
+                        <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item" data-value="add">Add Two Numbers</div>
+                        <div class="dropdown-item" data-value="countdown">Countdown</div>
+                        <div class="dropdown-item" data-value="multiply">Multiply</div>
+                        <div class="dropdown-item" data-value="fibonacci">Fibonacci</div>
+                        <div class="dropdown-item" data-value="echo">Echo Characters</div>
+                    </div>
+                </div>
             </div>
         </div>
 
