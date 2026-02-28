@@ -41,6 +41,7 @@
 /* --- Reset --- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+html.editor-active, html.editor-active body { overflow: hidden; height: 100vh; }
 body {
     font-family: var(--font-sans);
     background: var(--bg-primary);
@@ -113,6 +114,12 @@ h3 { font-size: 1.25rem; }
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(12px);
+}
+html.editor-active .navbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 53px;
 }
 .nav-brand a {
     display: flex;
@@ -667,11 +674,17 @@ h3 { font-size: 1.25rem; }
     grid-template-rows: auto 1fr auto;
     height: calc(100vh - 53px);
     overflow: hidden;
+    position: fixed;
+    top: 53px;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 /* Toolbar */
 .editor-toolbar {
     grid-column: 1 / -1;
+    grid-row: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -679,6 +692,8 @@ h3 { font-size: 1.25rem; }
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     gap: 0.5rem;
+    z-index: 50;
+    flex-shrink: 0;
 }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 0.5rem; }
 .toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 0.25rem; }
@@ -710,10 +725,12 @@ h3 { font-size: 1.25rem; }
 
 /* Code editor pane */
 .editor-pane {
+    grid-row: 2;
     display: flex;
     flex-direction: column;
     border-right: 1px solid var(--border);
     overflow: hidden;
+    min-height: 0;
 }
 .editor-pane-header {
     display: flex;
@@ -786,10 +803,12 @@ h3 { font-size: 1.25rem; }
 
 /* CPU Visualization pane */
 .viz-pane {
+    grid-row: 2;
     display: flex;
     flex-direction: column;
-    overflow: auto;
+    overflow: hidden;
     background: var(--bg-primary);
+    min-height: 0;
 }
 .viz-pane-header {
     display: flex;
@@ -978,11 +997,14 @@ h3 { font-size: 1.25rem; }
 /* I/O Panel */
 .io-panel {
     grid-column: 1 / -1;
+    grid-row: 3;
     display: flex;
     border-top: 2px solid var(--border);
     background: var(--bg-secondary);
     min-height: 140px;
     max-height: 200px;
+    flex-shrink: 0;
+    overflow: hidden;
 }
 .io-section {
     flex: 1;
