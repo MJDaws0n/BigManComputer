@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples - Big Man Computer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .example-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .example-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+        .example-card-header {
+            padding: 1rem 1.25rem 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .example-card-header h3 {
+            font-size: 1rem;
+            margin: 0;
+            color: var(--text-primary);
+        }
+        .example-badge {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 99px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-easy { background: var(--green); color: #000; }
+        .badge-medium { background: var(--orange); color: #000; }
+        .badge-hard { background: var(--red); color: #fff; }
+        .badge-extreme { background: linear-gradient(135deg, var(--purple), var(--red)); color: #fff; }
+        .example-card-desc {
+            padding: 0 1.25rem 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .example-card-code {
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre;
+            line-height: 1.5;
+        }
+        .example-card-actions {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.5rem;
+        }
+        .example-card-actions .btn { flex: 1; text-align: center; font-size: 0.8rem; }
+        .examples-intro {
+            max-width: 700px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        .examples-filter {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        .filter-btn {
+            padding: 0.4rem 1rem;
+            border-radius: 99px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            border-color: var(--accent);
+            color: var(--text-primary);
+            background: var(--accent-dim);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/"><span class="nav-title">BMC</span></a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/editor" class="nav-link">Editor</a>
+            <a href="/examples" class="nav-link active">Examples</a>
+            <a href="/help" class="nav-link">Help</a>
+            <a href="/credits" class="nav-link">Credits</a>
+            <div class="nav-auth" id="nav-auth">
+                <a href="/login" class="btn btn-outline btn-sm">Log In</a>
+                <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content-page">
+        <h1>Example <span class="gradient-text">Programs</span></h1>
+        <p class="examples-intro">
+            Explore these BMC assembly programs — from simple arithmetic to complex algorithms.
+            Click <strong>Open in Editor</strong> to load any example directly into the IDE and step through it instruction by instruction.
+        </p>
+
+        <div class="examples-filter">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="easy">Easy</button>
+            <button class="filter-btn" data-filter="medium">Medium</button>
+            <button class="filter-btn" data-filter="hard">Hard</button>
+            <button class="filter-btn" data-filter="extreme">Extreme</button>
+        </div>
+
+        <div class="examples-grid" id="examples-grid">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand"> Big Man Computer</div>
+            <div class="footer-links">
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/credits">Credits</a>
+            </div>
+            <p class="footer-copy">Built with <a href="https://github.com/MJDaws0n/Novus" target="_blank">Novus</a></p>
+        </div>
+    </footer>
+
+    <script src="/js/app.js"></script>
+    <script>
+const EXAMPLES = [
+{
+    name: "Add Two Numbers",
+    difficulty: "easy",
+    desc: "Takes two inputs and outputs their sum. The simplest BMC program.",
+    code: `; Add Two Numbers
+        INP          ; Get first number
+        STA num1     ; Store it
+        INP          ; Get second number
+        ADD num1     ; Add first number
+        OUT          ; Display sum
+        HLT
+
+num1:   DAT 0`
+},
+{
+    name: "Countdown",
+    difficulty: "easy",
+    desc: "Counts down from an input number to zero using a loop and branch.",
+    code: `; Countdown from Input
+        INP          ; Get starting number
+loop:   OUT          ; Display current
+        SUB one      ; Subtract 1
+        BRP loop     ; Loop if >= 0
+        HLT
+
+one:    DAT 1`
+},
+{
+    name: "Multiplication",
+    difficulty: "medium",
+    desc: "Multiplies two input numbers using repeated addition — BMC has no hardware multiply.",
+    code: `; Multiply by Repeated Addition
+        INP          ; Multiplier
+        STA count
+        INP          ; Multiplicand
+        STA num
+        LDA zero
+        STA result
+loop:   LDA count
+        BRZ done     ; count == 0? done
+        LDA result
+        ADD num
+        STA result
+        LDA count
+        SUB one
+        STA count
+        BRA loop
+done:   LDA result
+        OUT
+        HLT
+
+count:  DAT 0
+num:    DAT 0
+result: DAT 0
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "Integer Division",
+    difficulty: "medium",
+    desc: "Divides first input by second using repeated subtraction. Outputs quotient and remainder.",
+    code: `; Division with Remainder
+        INP          ; Dividend
+        STA dvd
+        INP          ; Divisor
+        STA dvs
+        LDA zero
+        STA quot
+loop:   LDA dvd
+        SUB dvs
+        BRP cont     ; Still positive? continue
+        LDA quot
+        OUT          ; Output quotient
+        LDA dvd
+        OUT          ; Output remainder
+        HLT
+cont:   STA dvd
+        LDA quot
+        ADD one
+        STA quot
+        BRA loop
+
+dvd:    DAT 0
+dvs:    DAT 0
+quot:   DAT 0
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "Absolute Value",
+    difficulty: "easy",
+    desc: "Outputs the absolute value of a number. Negates it if negative.",
+    code: `; Absolute Value
+        INP          ; Get number
+        BRP pos      ; If >= 0, already positive
+        STA temp     ; Store negative value
+        LDA zero
+        SUB temp     ; Negate: 0 - value
+pos:    OUT          ; Output absolute value
+        HLT
+
+temp:   DAT 0
+zero:   DAT 0`
+},
+{
+    name: "Fibonacci Sequence",
+    difficulty: "medium",
+    desc: "Generates Fibonacci numbers up to a limit. Demonstrates iterative computation with two accumulators.",
+    code: `; Fibonacci up to N
+        INP          ; How many numbers?
+        STA count
+        LDA zero
+        STA a
+        LDA one
+        STA b
+loop:   LDA count
+        BRZ done
+        LDA a
+        OUT          ; Print current
+        LDA a
+        ADD b
+        STA temp
+        LDA b
+        STA a
+        LDA temp
+        STA b
+        LDA count
+        SUB one
+        STA count
+        BRA loop
+done:   HLT
+
+a:      DAT 0
+b:      DAT 0
+temp:   DAT 0
+count:  DAT 0
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "Bubble Sort (3 Numbers)",
+    difficulty: "hard",
+    desc: "Sorts three input numbers in ascending order using bubble sort. Shows comparison and swapping logic in assembly.",
+    code: `; Bubble Sort 3 Numbers
+        INP
+        STA a
+        INP
+        STA b
+        INP
+        STA c
+; Pass 1: compare pairs
+        LDA a
+        SUB b
+        BRP sw1      ; a > b? swap
+        BRA p1e
+sw1:    LDA a
+        STA tmp
+        LDA b
+        STA a
+        LDA tmp
+        STA b
+p1e:    LDA b
+        SUB c
+        BRP sw2
+        BRA p2e
+sw2:    LDA b
+        STA tmp
+        LDA c
+        STA b
+        LDA tmp
+        STA c
+; Pass 2: one more compare
+p2e:    LDA a
+        SUB b
+        BRP sw3
+        BRA out
+sw3:    LDA a
+        STA tmp
+        LDA b
+        STA a
+        LDA tmp
+        STA b
+; Output sorted
+out:    LDA a
+        OUT
+        LDA b
+        OUT
+        LDA c
+        OUT
+        HLT
+
+a:      DAT 0
+b:      DAT 0
+c:      DAT 0
+tmp:    DAT 0`
+},
+{
+    name: "Power Calculator",
+    difficulty: "hard",
+    desc: "Calculates base^exponent using nested loops. Multiplies via repeated addition inside an exponent loop.",
+    code: `; base ^ exponent
+        INP          ; Base
+        STA base
+        INP          ; Exponent
+        STA exp
+        LDA one
+        STA result
+; Outer loop: multiply result by base, exp times
+eloop:  LDA exp
+        BRZ done
+        LDA zero
+        STA prod
+        LDA zero
+        STA mcnt
+; Inner loop: prod += result, base times
+mloop:  LDA mcnt
+        SUB base
+        BRZ mdone
+        LDA prod
+        ADD result
+        STA prod
+        LDA mcnt
+        ADD one
+        STA mcnt
+        BRA mloop
+mdone:  LDA prod
+        STA result
+        LDA exp
+        SUB one
+        STA exp
+        BRA eloop
+done:   LDA result
+        OUT
+        HLT
+
+base:   DAT 0
+exp:    DAT 0
+result: DAT 0
+prod:   DAT 0
+mcnt:   DAT 0
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "GCD (Euclidean Algorithm)",
+    difficulty: "hard",
+    desc: "Computes the Greatest Common Divisor of two numbers using Euclid's algorithm with repeated subtraction.",
+    code: `; GCD using Euclid's Algorithm
+        INP
+        STA a
+        INP
+        STA b
+loop:   LDA a
+        SUB b
+        BRZ done     ; a == b → GCD found
+        BRP abig     ; a > b
+; b > a: swap
+        LDA a
+        STA tmp
+        LDA b
+        STA a
+        LDA tmp
+        STA b
+        BRA loop
+abig:   STA a        ; a = a - b
+        BRA loop
+done:   LDA a
+        OUT
+        HLT
+
+a:      DAT 0
+b:      DAT 0
+tmp:    DAT 0`
+},
+{
+    name: "Print Hello World",
+    difficulty: "medium",
+    desc: "Outputs 'HELLO WORLD' character by character using OTC (Output as Character) with ASCII codes.",
+    code: `; HELLO WORLD using OTC
+        LDA H
+        OTC
+        LDA E
+        OTC
+        LDA L
+        OTC
+        LDA L
+        OTC
+        LDA O
+        OTC
+        LDA sp
+        OTC
+        LDA W
+        OTC
+        LDA O
+        OTC
+        LDA R
+        OTC
+        LDA L
+        OTC
+        LDA D
+        OTC
+        LDA nl
+        OTC
+        HLT
+
+H:      DAT 72
+E:      DAT 69
+L:      DAT 76
+O:      DAT 79
+sp:     DAT 32
+W:      DAT 87
+R:      DAT 82
+D:      DAT 68
+nl:     DAT 10`
+},
+{
+    name: "Number Reverser",
+    difficulty: "hard",
+    desc: "Takes a 3-digit number and reverses its digits. Uses division and modulo to extract each digit.",
+    code: `; Reverse a 3-digit number
+; Input: e.g. 123 → Output: 321
+        INP
+        STA num
+; Get hundreds digit: num / 100
+        LDA zero
+        STA hund
+h_lp:   LDA num
+        SUB hundred
+        BRP h_ct
+        BRA h_dn
+h_ct:   STA num
+        LDA hund
+        ADD one
+        STA hund
+        BRA h_lp
+; Get tens digit: remaining / 10
+h_dn:   LDA zero
+        STA tens
+t_lp:   LDA num
+        SUB ten
+        BRP t_ct
+        BRA t_dn
+t_ct:   STA num
+        LDA tens
+        ADD one
+        STA tens
+        BRA t_lp
+; Ones digit is what remains
+t_dn:   LDA num
+        STA ones
+; Build reversed: ones*100 + tens*10 + hund
+        LDA zero
+        STA result
+; ones * 100
+        LDA zero
+        STA cnt
+o_lp:   LDA cnt
+        SUB ones
+        BRZ o_dn
+        LDA result
+        ADD hundred
+        STA result
+        LDA cnt
+        ADD one
+        STA cnt
+        BRA o_lp
+; tens * 10
+o_dn:   LDA zero
+        STA cnt
+t2_lp:  LDA cnt
+        SUB tens
+        BRZ t2_dn
+        LDA result
+        ADD ten
+        STA result
+        LDA cnt
+        ADD one
+        STA cnt
+        BRA t2_lp
+; + hundreds
+t2_dn:  LDA result
+        ADD hund
+        OUT
+        HLT
+
+num:    DAT 0
+hund:   DAT 0
+tens:   DAT 0
+ones:   DAT 0
+cnt:    DAT 0
+result: DAT 0
+hundred: DAT 100
+ten:    DAT 10
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "Prime Checker",
+    difficulty: "extreme",
+    desc: "Checks if an input number is prime by testing divisibility from 2 up to n/2. Outputs 1 for prime, 0 for not prime.",
+    code: `; Prime Number Checker
+; Output 1 = prime, 0 = not prime
+        INP
+        STA num
+; Check < 2
+        SUB two
+        BRP chk
+; < 2 → not prime
+        LDA zero
+        OUT
+        HLT
+chk:    LDA two
+        STA div
+; Half the number for upper bound
+        LDA num
+        STA half
+        LDA zero
+        STA hlf
+hf_lp:  LDA half
+        SUB two
+        BRP hf_c
+        BRA hf_d
+hf_c:   STA half
+        LDA hlf
+        ADD one
+        STA hlf
+        BRA hf_lp
+hf_d:   LDA hlf
+        ADD one
+        STA hlf
+; Test each divisor
+loop:   LDA div
+        SUB hlf
+        BRP prime    ; div > n/2 → prime
+; Try num % div via repeated subtraction
+        LDA num
+        STA rem
+md_lp:  LDA rem
+        SUB div
+        BRZ notpr    ; divides evenly
+        BRP md_ct
+        BRA nxtdv    ; remainder < div → not divisible
+md_ct:  STA rem
+        BRA md_lp
+notpr:  LDA zero
+        OUT
+        HLT
+nxtdv:  LDA div
+        ADD one
+        STA div
+        BRA loop
+prime:  LDA one
+        OUT
+        HLT
+
+num:    DAT 0
+div:    DAT 0
+rem:    DAT 0
+half:   DAT 0
+hlf:    DAT 0
+zero:   DAT 0
+one:    DAT 1
+two:    DAT 2`
+},
+{
+    name: "Factorial",
+    difficulty: "hard",
+    desc: "Calculates N! (factorial) using nested multiplication loops. Watch the CPU accumulate the result step by step.",
+    code: `; Factorial Calculator
+; Warning: values > 7 will overflow!
+        INP
+        STA n
+        LDA one
+        STA fact
+; fact = fact * n, then n--
+loop:   LDA n
+        BRZ done
+        LDA zero
+        STA prod
+        LDA zero
+        STA cnt
+; prod = fact * n (repeated addition)
+m_lp:   LDA cnt
+        SUB n
+        BRZ m_dn
+        LDA prod
+        ADD fact
+        STA prod
+        LDA cnt
+        ADD one
+        STA cnt
+        BRA m_lp
+m_dn:   LDA prod
+        STA fact
+        LDA n
+        SUB one
+        STA n
+        BRA loop
+done:   LDA fact
+        OUT
+        HLT
+
+n:      DAT 0
+fact:   DAT 0
+prod:   DAT 0
+cnt:    DAT 0
+zero:   DAT 0
+one:    DAT 1`
+},
+{
+    name: "Binary Converter",
+    difficulty: "extreme",
+    desc: "Converts a decimal number (0–255) to its 8-bit binary representation, outputting each bit as 0 or 1.",
+    code: `; Decimal to Binary (8-bit)
+; Outputs each bit from MSB to LSB
+        INP
+        STA num
+; Test bit 7 (128)
+        LDA num
+        SUB b128
+        BRP s7
+        LDA zero
+        OUT
+        BRA t6
+s7:     STA num
+        LDA one
+        OUT
+; Test bit 6 (64)
+t6:     LDA num
+        SUB b64
+        BRP s6
+        LDA zero
+        OUT
+        BRA t5
+s6:     STA num
+        LDA one
+        OUT
+; Test bit 5 (32)
+t5:     LDA num
+        SUB b32
+        BRP s5
+        LDA zero
+        OUT
+        BRA t4
+s5:     STA num
+        LDA one
+        OUT
+; Test bit 4 (16)
+t4:     LDA num
+        SUB b16
+        BRP s4
+        LDA zero
+        OUT
+        BRA t3
+s4:     STA num
+        LDA one
+        OUT
+; Test bit 3 (8)
+t3:     LDA num
+        SUB b8
+        BRP s3
+        LDA zero
+        OUT
+        BRA t2
+s3:     STA num
+        LDA one
+        OUT
+; Test bit 2 (4)
+t2:     LDA num
+        SUB b4
+        BRP s2
+        LDA zero
+        OUT
+        BRA t1
+s2:     STA num
+        LDA one
+        OUT
+; Test bit 1 (2)
+t1:     LDA num
+        SUB two
+        BRP s1
+        LDA zero
+        OUT
+        BRA t0
+s1:     STA num
+        LDA one
+        OUT
+; Test bit 0 (1)
+t0:     LDA num
+        SUB one
+        BRP s0
+        LDA zero
+        OUT
+        HLT
+s0:     LDA one
+        OUT
+        HLT
+
+num:    DAT 0
+zero:   DAT 0
+one:    DAT 1
+two:    DAT 2
+b4:     DAT 4
+b8:     DAT 8
+b16:    DAT 16
+b32:    DAT 32
+b64:    DAT 64
+b128:   DAT 128`
+},
+{
+    name: "String Input Echo",
+    difficulty: "medium",
+    desc: "Reads characters one at a time (as ASCII codes) and echoes them back. Enter 0 to stop. Try typing letters!",
+    code: `; Echo characters until 0
+; Type a letter — it auto-converts to ASCII
+loop:   INP          ; Get char (or ASCII code)
+        BRZ done     ; 0 = stop
+        OTC          ; Output as character
+        BRA loop
+done:   LDA nl
+        OTC          ; Newline
+        HLT
+
+nl:     DAT 10`
+},
+{
+    name: "Collatz Conjecture",
+    difficulty: "extreme",
+    desc: "Runs the Collatz sequence (3n+1 problem) on an input number. If even: n/2, if odd: 3n+1. Always reaches 1... probably.",
+    code: `; Collatz Conjecture (3n+1)
+; Outputs each step until reaching 1
+        INP
+        STA n
+loop:   LDA n
+        OUT          ; Print current value
+        SUB one
+        BRZ done     ; Reached 1? stop
+; Check if n is even: n mod 2
+        LDA n
+        STA tmp
+        LDA zero
+        STA rem
+ev_lp:  LDA tmp
+        SUB two
+        BRP ev_ct
+; tmp < 2, so rem = tmp
+        LDA tmp
+        STA rem
+        BRA ev_dn
+ev_ct:  STA tmp
+        BRA ev_lp
+ev_dn:  LDA rem
+        BRZ even
+; Odd: n = 3n + 1
+        LDA n
+        STA tmp
+        ADD n
+        ADD tmp
+        ADD one
+        STA n
+        BRA loop
+; Even: n = n / 2
+even:   LDA zero
+        STA half
+        LDA n
+        STA tmp
+dv_lp:  LDA tmp
+        SUB two
+        BRP dv_ct
+        BRA dv_dn
+dv_ct:  STA tmp
+        LDA half
+        ADD one
+        STA half
+        BRA dv_lp
+dv_dn:  LDA half
+        STA n
+        BRA loop
+done:   LDA one
+        OUT          ; Print final 1
+        HLT
+
+n:      DAT 0
+tmp:    DAT 0
+rem:    DAT 0
+half:   DAT 0
+zero:   DAT 0
+one:    DAT 1
+two:    DAT 2`
+},
+{
+    name: "Calculator",
+    difficulty: "extreme",
+    desc: "A simple calculator. Input two numbers and an operation code (1=Add, 2=Sub, 3=Mul, 4=Div). Outputs the result.",
+    code: `; Interactive Calculator
+; Input: num1, num2, op (1-4)
+; 1=ADD 2=SUB 3=MUL 4=DIV
+        INP          ; First number
+        STA a
+        INP          ; Second number
+        STA b
+        INP          ; Operation code
+        STA op
+; Check operation
+        LDA op
+        SUB one
+        BRZ doAdd
+        LDA op
+        SUB two
+        BRZ doSub
+        LDA op
+        SUB three
+        BRZ doMul
+        LDA op
+        SUB four
+        BRZ doDiv
+; Invalid op
+        LDA neg
+        OUT
+        HLT
+doAdd:  LDA a
+        ADD b
+        OUT
+        HLT
+doSub:  LDA a
+        SUB b
+        OUT
+        HLT
+doMul:  LDA zero
+        STA res
+        LDA zero
+        STA cnt
+ml:     LDA cnt
+        SUB a
+        BRZ md
+        LDA res
+        ADD b
+        STA res
+        LDA cnt
+        ADD one
+        STA cnt
+        BRA ml
+md:     LDA res
+        OUT
+        HLT
+doDiv:  LDA zero
+        STA res
+        LDA a
+        STA rem
+dl:     LDA rem
+        SUB b
+        BRP dc
+        LDA res
+        OUT
+        HLT
+dc:     STA rem
+        LDA res
+        ADD one
+        STA res
+        BRA dl
+
+a:      DAT 0
+b:      DAT 0
+op:     DAT 0
+res:    DAT 0
+rem:    DAT 0
+cnt:    DAT 0
+neg:    DAT 999
+zero:   DAT 0
+one:    DAT 1
+two:    DAT 2
+three:  DAT 3
+four:   DAT 4`
+}
+];
+
+function escapeForAttr(s) {
+    return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderExamples(filter) {
+    const grid = document.getElementById('examples-grid');
+    if (!grid) return;
+    const filtered = filter === 'all' ? EXAMPLES : EXAMPLES.filter(e => e.difficulty === filter);
+    grid.innerHTML = filtered.map((ex, i) => {
+        const badgeClass = {easy:'badge-easy',medium:'badge-medium',hard:'badge-hard',extreme:'badge-extreme'}[ex.difficulty] || '';
+        return '<div class="example-card" data-difficulty="' + ex.difficulty + '">' +
+            '<div class="example-card-header">' +
+                '<h3>' + ex.name + '</h3>' +
+                '<span class="example-badge ' + badgeClass + '">' + ex.difficulty + '</span>' +
+            '</div>' +
+            '<div class="example-card-desc">' + ex.desc + '</div>' +
+            '<div class="example-card-code">' + escapeForAttr(ex.code) + '</div>' +
+            '<div class="example-card-actions">' +
+                '<button class="btn btn-primary btn-sm" onclick="openInEditor(' + i + ')">🚀 Open in Editor</button>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+function openInEditor(idx) {
+    const ex = EXAMPLES[idx];
+    if (ex) {
+        localStorage.setItem('bmc_autosave', ex.code);
+        window.location.href = '/editor';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderExamples('all');
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderExamples(btn.dataset.filter);
+        });
+    });
+});
+    </script>
+</body>
+</html>

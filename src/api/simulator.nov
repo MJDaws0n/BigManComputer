@@ -23,6 +23,23 @@ fn sim_state_path(key: str) -> str {
     return "data/sim_" + key + ".state";
 }
 
+// Sanitise session key to prevent path traversal
+fn sanitise_sim_key(key: str) -> str {
+    let result: str = "";
+    let i: i32 = 0;
+    while (i < len(key)) {
+        let ch: i32 = key[i] & 255;
+        if (is_alnum(ch) || ch == 95 || ch == 120) {
+            result = result + key[i];
+        }
+        i = i + 1;
+    }
+    if (len(result) > 128) {
+        result = substr_len(result, 0, 128);
+    }
+    return result;
+}
+
 // ---------------------------------------------------------------------------
 // Get or create a session key from the request
 // ---------------------------------------------------------------------------
@@ -30,13 +47,13 @@ fn sim_state_path(key: str) -> str {
 fn get_sim_key(request: str) -> str {
     let body: str = api_get_body(request);
     let sid: str = json_get_value(body, "session_id");
-    if (len(sid) > 0) { return sid; }
+    if (len(sid) > 0) { return sanitise_sim_key(sid); }
 
     let token: str = get_session_cookie(request);
     if (len(token) == 0) {
         return "anon_" + i64_to_str(get_time_us());
     }
-    return token;
+    return sanitise_sim_key(token);
 }
 
 // ---------------------------------------------------------------------------

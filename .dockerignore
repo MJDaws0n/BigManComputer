@@ -1,0 +1,24 @@
+# Git directories (especially from cloned lib repos)
+.git
+lib/*/.git
+
+# Build artifacts (rebuilt in container)
+build/
+*.o
+*.s
+
+# Data files (mounted as volume)
+data/*.db
+
+# IDE / OS files
+.DS_Store
+*.swp
+.vscode/
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Novus compiler binary (built from source in Docker)
+novus-linux-amd64

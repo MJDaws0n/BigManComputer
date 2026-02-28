@@ -14,6 +14,7 @@
         <div class="nav-links">
             <a href="/" class="nav-link">Home</a>
             <a href="/editor" class="nav-link active">Editor</a>
+            <a href="/examples" class="nav-link">Examples</a>
             <a href="/help" class="nav-link">Help</a>
             <a href="/credits" class="nav-link">Credits</a>
             <div class="nav-auth" id="nav-auth">
@@ -54,9 +55,7 @@
                 <span class="toolbar-status status-ready" id="status-indicator">● Ready</span>
             </div>
             <div class="toolbar-right">
-                <button class="btn btn-ghost btn-sm" id="btn-save" title="Save program (requires login)">💾 Save</button>
-                <button class="btn btn-ghost btn-sm" id="btn-export" title="Export as executable">📦 Export</button>
-                <button class="btn btn-ghost btn-sm" id="btn-export-src" title="Export Novus source">📄 Source</button>
+                <button class="btn btn-ghost btn-sm" id="btn-save" title="Save program">💾 Save</button>
                 <button class="btn btn-ghost btn-sm" id="btn-export-asm" title="Download assembly source">🔩 Assembly</button>
                 <div class="toolbar-sep"></div>
                 <div class="custom-dropdown" id="example-dropdown">
@@ -220,6 +219,8 @@
                             <div class="dropdown-item" data-value="arm64-linux">ARM64 / AArch64 (Linux)</div>
                             <div class="dropdown-item" data-value="x86_64-linux">x86_64 / AMD64 (Linux)</div>
                             <div class="dropdown-item" data-value="x86_64-macos">x86_64 / Intel (macOS)</div>
+                            <div class="dropdown-item" data-value="x86_64-windows">x86_64 / AMD64 (Windows)</div>
+                            <div class="dropdown-item" data-value="arm64-windows">ARM64 / AArch64 (Windows)</div>
                         </div>
                     </div>
                 </div>
@@ -236,8 +237,18 @@
     </div>
 
     <script src="/js/app.js"></script>
+    <script src="/js/bmcvm.js"></script>
     <script src="/js/asmgen.js"></script>
     <script src="/js/editor.js"></script>
     <script src="/js/simulator.js"></script>
+    <script>
+    // Measure actual navbar height and set CSS variable for editor layout
+    function syncNavHeight() {
+        const nav = document.querySelector('.navbar');
+        if (nav) document.documentElement.style.setProperty('--navbar-h', nav.offsetHeight + 'px');
+    }
+    syncNavHeight();
+    window.addEventListener('resize', syncNavHeight);
+    </script>
 </body>
 </html>

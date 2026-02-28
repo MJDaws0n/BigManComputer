@@ -75,6 +75,16 @@ fn handle_signup(request: str, client_fd: i32) -> void {
         return;
     }
 
+    if (len(username) > 32) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Username must be 32 characters or less\"}");
+        return;
+    }
+
+    if (len(password) > 128) {
+        api_send_json(client_fd, 400, "{\"ok\":false,\"error\":\"Password must be 128 characters or less\"}");
+        return;
+    }
+
     // Check username is alphanumeric
     let valid: bool = true;
     let vi: i32 = 0;

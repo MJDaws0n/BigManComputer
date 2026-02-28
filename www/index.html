@@ -17,6 +17,7 @@
         <div class="nav-links">
             <a href="/" class="nav-link active">Home</a>
             <a href="/editor" class="nav-link">Editor</a>
+            <a href="/examples" class="nav-link">Examples</a>
             <a href="/help" class="nav-link">Help</a>
             <a href="/credits" class="nav-link">Credits</a>
             <div class="nav-auth" id="nav-auth">
@@ -135,7 +136,7 @@
 num1:   DAT 0        ; Storage for first number</code></pre>
         </div>
         <p class="example-desc">This program asks for two numbers, adds them, and displays the result.</p>
-        <a href="/editor?example=add" class="btn btn-primary">Try This in the Editor →</a>
+        <a href="#" class="btn btn-primary" id="btn-try-example" onclick="localStorage.setItem('bmc_autosave',document.querySelector('.code-body code').textContent);window.location.href='/editor';return false;">Try This in the Editor →</a>
     </section>
 
     <footer class="footer">
@@ -147,7 +148,6 @@ num1:   DAT 0        ; Storage for first number</code></pre>
                 <a href="/privacy">Privacy Policy</a>
                 <a href="/credits">Credits</a>
                 <a href="/help">Documentation</a>
-                <a href="https://github.com/MJDaws0n/BigManComputer" target="_blank">GitHub</a>
             </div>
             <p class="footer-copy">Built with <a href="https://github.com/MJDaws0n/Novus" target="_blank">Novus</a> by <a href="https://mjdawson.net" target="_blank">MJ Dawson</a></p>
         </div>

@@ -21,3 +21,7 @@ Thumbs.db
 
 # Cookies/temp from testing
 /tmp/bmc_*
+
+# Binary tools (not committed)
+novus-linux-amd64
+.env

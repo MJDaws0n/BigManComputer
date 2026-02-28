@@ -39,12 +39,7 @@ VM states are stored as individual files in `data/sim_<session_id>.state`. This 
 
 ```bash
 # Install dependencies
-nox pull http
-nox pull file_io
-nox pull process
-nox pull env
-nox pull time
-nox pull maths
+nox init
 
 # Build
 novus main.nov

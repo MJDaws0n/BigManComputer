@@ -1,8 +1,9 @@
 // ============================================================================
-// BMC - CPU Simulator & Visualization
+// BMC - CPU Simulator & Visualization (Client-Side)
+// Uses BMC.parse/step/run from bmcvm.js — no network calls for execution.
 // ============================================================================
 
-let sessionId = null;
+let vm = null;
 let vmState = null;
 let stepCount = 0;
 let isRunning = false;
@@ -12,11 +13,7 @@ let lastOutputLen = 0;
 let clockMultiplier = 1;
 const BASE_INTERVAL = 300; // ms at 1x speed
 
-const OPCODE_NAMES = {
-    1: 'LDA', 2: 'STA', 3: 'ADD', 4: 'SUB', 5: 'MUL', 6: 'DIV', 7: 'MOD',
-    8: 'INP', 9: 'OUT', 10: 'OTC', 11: 'HLT', 12: 'BRA', 13: 'BRZ',
-    14: 'BRP', 15: 'AND', 16: 'OR', 17: 'NOT', 0: '---'
-};
+const OPCODE_NAMES = BMC.OP_NAMES;
 
 document.addEventListener('DOMContentLoaded', () => {
     initMemoryGrid();
@@ -63,7 +60,6 @@ function setupControls() {
             const val = parseFloat(e.detail.value);
             if (val > 0) {
                 clockMultiplier = val;
-                // If currently running, restart interval with new speed
                 if (isRunning) {
                     stopRunning();
                     startRunning();
@@ -73,9 +69,9 @@ function setupControls() {
     }
 }
 
-// ---- API Calls ----
+// ---- Client-Side Execution ----
 
-async function loadProgram() {
+function loadProgram() {
     const code = getCode();
     if (!code.trim()) {
         bmcAlert('Write some code first!', 'warning');
@@ -86,77 +82,54 @@ async function loadProgram() {
     clearOutput();
     clearLog();
     stepCount = 0;
+    lastOutputLen = 0;
 
-    try {
-        const res = await fetch('/api/load', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ code })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            sessionId = data.session_id;
-            vmState = data.state;
-            updateVisualization();
-            setStatus('ready', '● Loaded');
-            enableControls(true);
-            addLog('Program loaded successfully (' + (data.instruction_count || '?') + ' instructions)');
-        } else {
-            setStatus('halted', '✖ Error');
-            addLog('ERROR: ' + (data.error || 'Failed to load'));
-            bmcAlert('Parse error: ' + (data.error || 'Unknown error'), 'error');
-        }
-    } catch(e) {
+    const parsed = BMC.parse(code);
+    if (parsed.error) {
         setStatus('halted', '✖ Error');
-        addLog('ERROR: Connection failed');
+        addLog('ERROR: ' + parsed.error);
+        bmcAlert('Parse error: ' + parsed.error, 'error');
+        return;
     }
+
+    vm = BMC.createVM(parsed);
+    vmState = BMC.toJSON(vm);
+    updateVisualization();
+    setStatus('ready', '● Loaded');
+    enableControls(true);
+    addLog('Program loaded (' + parsed.instCount + ' instructions)');
 }
 
-async function stepProgram() {
-    if (!sessionId) return;
+function stepProgram() {
+    if (!vm) return;
 
-    try {
-        const res = await fetch('/api/step', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ session_id: sessionId })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            const prevState = vmState;
-            vmState = data.state;
-            stepCount++;
-            updateVisualization(prevState);
+    const prevState = vmState;
+    BMC.step(vm);
+    vmState = BMC.toJSON(vm);
+    stepCount++;
+    updateVisualization(prevState);
 
-            // Show only new output since last step
-            const fullOutput = data.state ? (data.state.output || '') : '';
-            if (fullOutput.length > lastOutputLen) {
-                const newPart = fullOutput.substring(lastOutputLen);
-                displayNewOutput(newPart);
-                lastOutputLen = fullOutput.length;
-            }
+    // Show new output
+    const fullOutput = vm.output || '';
+    if (fullOutput.length > lastOutputLen) {
+        displayNewOutput(fullOutput.substring(lastOutputLen));
+        lastOutputLen = fullOutput.length;
+    }
 
-            if (data.halted) {
-                setStatus('halted', '■ Halted');
-                addLog('Step ' + stepCount + ': HLT — Program halted');
-                enableControls(false);
-                stopRunning();
-            } else if (data.waiting_input) {
-                wasRunningBeforeInput = isRunning;
-                setStatus('waiting', '⏸ Waiting for input');
-                addLog('Step ' + stepCount + ': INP — Waiting for input');
-                showInputBar(true);
-                stopRunning();
-            } else {
-                setStatus('ready', '● Step ' + stepCount);
-                const op = data.state ? (data.state.cir || '') : '';
-                addLog('Step ' + stepCount + ': ' + op);
-            }
-        } else {
-            addLog('ERROR: ' + (data.error || 'Step failed'));
-        }
-    } catch(e) {
-        addLog('ERROR: Connection failed');
+    if (vm.halted) {
+        setStatus('halted', '■ Halted');
+        addLog('Step ' + stepCount + ': HLT — Program halted');
+        enableControls(false);
+        stopRunning();
+    } else if (vm.error === 'WAITING_INPUT') {
+        wasRunningBeforeInput = isRunning;
+        setStatus('waiting', '⏸ Waiting for input');
+        addLog('Step ' + stepCount + ': INP — Waiting for input');
+        showInputBar(true);
+        stopRunning();
+    } else {
+        setStatus('ready', '● Step ' + stepCount);
+        addLog('Step ' + stepCount + ': ' + (vmState.cir || ''));
     }
 }
 
@@ -175,9 +148,9 @@ function startRunning() {
     setStatus('running', '▶ Running');
 
     const interval = Math.max(1, Math.round(BASE_INTERVAL / clockMultiplier));
-    runInterval = setInterval(async () => {
-        if (!isRunning) return;
-        await stepProgram();
+    runInterval = setInterval(() => {
+        if (!isRunning || !vm) return;
+        stepProgram();
     }, interval);
 }
 
@@ -191,70 +164,68 @@ function stopRunning() {
     if (btn) { btn.textContent = '⏩ Run'; }
 }
 
-async function resetProgram() {
-    if (!sessionId) return;
+function resetProgram() {
+    if (!vm) return;
     stopRunning();
 
-    try {
-        const res = await fetch('/api/reset', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ session_id: sessionId })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            vmState = data.state;
-            stepCount = 0;
-            updateVisualization();
-            setStatus('ready', '● Reset');
-            enableControls(true);
-            clearOutput();
-            clearLog();
-            addLog('Simulator reset');
-            showInputBar(false);
-        }
-    } catch(e) {
-        addLog('ERROR: Reset failed');
+    // Re-parse and re-create VM from current code
+    const code = getCode();
+    if (!code.trim()) return;
+
+    const parsed = BMC.parse(code);
+    if (parsed.error) {
+        addLog('ERROR: ' + parsed.error);
+        return;
     }
+
+    vm = BMC.createVM(parsed);
+    vmState = BMC.toJSON(vm);
+    stepCount = 0;
+    lastOutputLen = 0;
+    updateVisualization();
+    setStatus('ready', '● Reset');
+    enableControls(true);
+    clearOutput();
+    clearLog();
+    addLog('Simulator reset');
+    showInputBar(false);
 }
 
-async function sendInput() {
+function sendInput() {
     const field = document.getElementById('input-field');
-    if (!field || !sessionId) return;
-    const value = field.value.trim();
-    if (value === '') return;
+    if (!field || !vm) return;
+    const raw = field.value.trim();
+    if (raw === '') return;
 
-    try {
-        const res = await fetch('/api/input', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ session_id: sessionId, value: String(parseInt(value) || 0) })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            vmState = data.state;
-            stepCount++;
-            updateVisualization();
-            addLog('Input: ' + value);
-            appendInputDisplay(value);
-            showInputBar(false);
-            setStatus('ready', '● Step ' + stepCount);
+    // If it's a number, use it directly; if it's a character, use its ASCII code
+    let value;
+    if (/^-?\d+$/.test(raw)) {
+        value = parseInt(raw, 10);
+    } else {
+        value = raw.charCodeAt(0);
+    }
 
-            // Show any new output from the INP step
-            const fullOutput = data.state ? (data.state.output || '') : '';
-            if (fullOutput.length > lastOutputLen) {
-                displayNewOutput(fullOutput.substring(lastOutputLen));
-                lastOutputLen = fullOutput.length;
-            }
+    BMC.provideInput(vm, value);
+    BMC.step(vm);
+    vmState = BMC.toJSON(vm);
+    stepCount++;
+    updateVisualization();
+    addLog('Input: ' + raw + (raw !== String(value) ? ' (ASCII ' + value + ')' : ''));
+    appendInputDisplay(raw !== String(value) ? raw + ' → ' + value : String(value));
+    showInputBar(false);
+    setStatus('ready', '● Step ' + stepCount);
 
-            // Resume running if we were in run mode
-            if (wasRunningBeforeInput) {
-                wasRunningBeforeInput = false;
-                startRunning();
-            }
-        }
-    } catch(e) {
-        addLog('ERROR: Input failed');
+    // Show any new output
+    const fullOutput = vm.output || '';
+    if (fullOutput.length > lastOutputLen) {
+        displayNewOutput(fullOutput.substring(lastOutputLen));
+        lastOutputLen = fullOutput.length;
+    }
+
+    // Resume running if we were in run mode
+    if (wasRunningBeforeInput) {
+        wasRunningBeforeInput = false;
+        startRunning();
     }
 
     field.value = '';
@@ -383,14 +354,26 @@ function clearOutput() {
 function displayNewOutput(text) {
     const el = document.getElementById('output-area');
     if (!el || !text) return;
-    // Split by newlines to create separate output lines
+    // Handle terminal-like output: only break to new div on \n
+    // OTC chars (no newline) append to the current line
     const parts = text.split('\n');
-    for (const part of parts) {
-        if (part === '') continue;
-        const line = document.createElement('div');
-        line.className = 'output-line';
-        line.textContent = part;
-        el.appendChild(line);
+    for (let i = 0; i < parts.length; i++) {
+        if (i === 0) {
+            // First part: append to last existing line, or create one
+            let last = el.querySelector('.output-line:last-child');
+            if (!last) {
+                last = document.createElement('div');
+                last.className = 'output-line';
+                el.appendChild(last);
+            }
+            last.textContent += parts[i];
+        } else {
+            // After each \n, start a new line
+            const line = document.createElement('div');
+            line.className = 'output-line';
+            line.textContent = parts[i];
+            el.appendChild(line);
+        }
     }
     el.scrollTop = el.scrollHeight;
 }

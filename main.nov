@@ -33,16 +33,33 @@ import src/api/export;
 // ---------------------------------------------------------------------------
 
 // Non-blocking waitpid to reap zombie children without blocking
-fn waitpid_nohang() -> void {
-    let st: i32 = 0;
-    let sa: u64 = &st;
-    // waitpid(-1, &st, WNOHANG=1) — reap one finished child per call
-    mov(x0, -1);
-    mov(x1, sa);
-    mov(x2, 1);
-    mov(x3, 0);
-    mov(x16, 0x2000007);
-    syscall();
+
+#if(os == "darwin") {
+    fn waitpid_nohang() -> void {
+        let st: i32 = 0;
+        let sa: u64 = &st;
+        // waitpid(-1, &st, WNOHANG=1) — reap one finished child per call
+        mov(x0, -1);
+        mov(x1, sa);
+        mov(x2, 1);
+        mov(x3, 0);
+        mov(x16, 0x2000007);
+        syscall();
+    }
+}
+
+#if(os == "linux") {
+    fn waitpid_nohang() -> void {
+        let st: i32 = 0;
+        let sa: u64 = &st;
+        // wait4(-1, &st, WNOHANG=1, NULL)
+        mov(rax, 61);      // SYS_wait4
+        mov(rdi, -1);
+        mov(rsi, sa);
+        mov(rdx, 1);       // WNOHANG
+        mov(r10, 0);       // rusage = NULL
+        syscall();
+    }
 }
 
 fn get_bmc_version() -> str {
@@ -83,9 +100,14 @@ fn parse_debug(argc: i32, argv: u64) -> bool {
 
 // ---------------------------------------------------------------------------
 // Serve static files from www/ directory
+// Uses direct file_read + net_write to bypass slow copy_bytes in read_file
 // ---------------------------------------------------------------------------
 
 fn serve_static_file(client_fd: i32, path: str) -> bool {
+    // Block path traversal attempts
+    if (str_contains(path, "..")) { return false; }
+    if (str_contains(path, "\\")) { return false; }
+
     let file_path: str = "www" + path;
 
     if (path == "/" || path == "") {
@@ -101,21 +123,36 @@ fn serve_static_file(client_fd: i32, path: str) -> bool {
         return false;
     }
 
-    let content: str = read_file(file_path);
-    if (len(content) == 0) {
+    // Open file and get size directly (avoids copy_bytes O(n^2))
+    let fd: i32 = file_open_read(file_path);
+    if (fd < 0) { return false; }
+    let sz: u64 = file_size(fd);
+    let isz: i32 = u64_to_i32(sz);
+    if (isz <= 0) {
+        file_close(fd);
         return false;
     }
 
     let content_type: str = http_content_type(file_path);
 
-    let response: str = "HTTP/1.1 200 OK\r\n";
-    response = response + "Content-Type: " + content_type + "\r\n";
-    response = response + "Content-Length: " + i32_to_str(len(content)) + "\r\n";
-    response = response + "Cache-Control: no-cache, must-revalidate\r\n";
-    response = response + "Connection: close\r\n";
-    response = response + "\r\n";
+    let response: str = "HTTP/1.1 200 OK\r\nContent-Type: " + content_type + "\r\nContent-Length: " + i32_to_str(isz) + "\r\nCache-Control: no-cache, must-revalidate\r\nConnection: close\r\n\r\n";
     net_write_str(client_fd, response);
-    net_write(client_fd, content, len(content));
+
+    // Send file in 8192-byte chunks (power-of-2 avoids O(n^2) in make_buffer)
+    let chunk: str = make_buffer(8192);
+    let chunk_ptr: u64 = ptr(chunk);
+    let remaining: i32 = isz;
+    while (remaining > 0) {
+        let to_read: i32 = 8192;
+        if (remaining < to_read) { to_read = remaining; }
+        let nr: i32 = file_read(fd, chunk_ptr, to_read);
+        if (nr <= 0) { remaining = 0; }
+        if (nr > 0) {
+            net_write(client_fd, chunk, nr);
+            remaining = remaining - nr;
+        }
+    }
+    file_close(fd);
 
     return true;
 }
@@ -198,6 +235,7 @@ fn handle_request(client_fd: i32, request: str, debug: bool) -> void {
     if (path == "/editor") { serve_static_file(client_fd, "/editor.html"); return; }
     if (path == "/help") { serve_static_file(client_fd, "/help.html"); return; }
     if (path == "/credits") { serve_static_file(client_fd, "/credits.html"); return; }
+    if (path == "/examples") { serve_static_file(client_fd, "/examples.html"); return; }
     if (path == "/dashboard") { serve_static_file(client_fd, "/dashboard.html"); return; }
     if (path == "/login") { serve_static_file(client_fd, "/login.html"); return; }
     if (path == "/signup") { serve_static_file(client_fd, "/signup.html"); return; }

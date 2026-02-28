@@ -95,10 +95,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!codeInput) return;
 
-    // Update line numbers on input
-    codeInput.addEventListener('input', updateLineNumbers);
+    // Auto-save to localStorage on every change
+    codeInput.addEventListener('input', () => {
+        updateLineNumbers();
+        saveToLocalStorage();
+    });
     codeInput.addEventListener('scroll', syncScroll);
-    codeInput.addEventListener('keydown', handleTab);
+    codeInput.addEventListener('keydown', handleKeydown);
+
+    // Load from localStorage if no query param loaded
+    const savedCode = localStorage.getItem('bmc_autosave');
+    if (savedCode && !new URLSearchParams(window.location.search).get('load') && !new URLSearchParams(window.location.search).get('example')) {
+        codeInput.value = savedCode;
+    }
 
     // Example selector (custom dropdown)
     const exDropdown = document.getElementById('example-dropdown');
@@ -148,15 +157,112 @@ function syncScroll() {
     }
 }
 
-function handleTab(e) {
+function saveToLocalStorage() {
+    if (codeInput) localStorage.setItem('bmc_autosave', codeInput.value);
+}
+
+// Undo/Redo stack for the code editor
+const undoStack = [];
+const redoStack = [];
+let undoTimer = null;
+
+function pushUndo() {
+    if (!codeInput) return;
+    const state = { value: codeInput.value, start: codeInput.selectionStart, end: codeInput.selectionEnd };
+    if (undoStack.length > 0 && undoStack[undoStack.length - 1].value === state.value) return;
+    undoStack.push(state);
+    if (undoStack.length > 200) undoStack.shift();
+    redoStack.length = 0;
+}
+
+function scheduleUndoSnapshot() {
+    if (undoTimer) clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => pushUndo(), 400);
+}
+
+function handleKeydown(e) {
+    // Ctrl+Z / Cmd+Z = Undo
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        if (undoStack.length > 0) {
+            redoStack.push({ value: codeInput.value, start: codeInput.selectionStart, end: codeInput.selectionEnd });
+            const prev = undoStack.pop();
+            codeInput.value = prev.value;
+            codeInput.selectionStart = prev.start;
+            codeInput.selectionEnd = prev.end;
+            updateLineNumbers();
+            saveToLocalStorage();
+        }
+        return;
+    }
+    // Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y = Redo
+    if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        if (redoStack.length > 0) {
+            undoStack.push({ value: codeInput.value, start: codeInput.selectionStart, end: codeInput.selectionEnd });
+            const next = redoStack.pop();
+            codeInput.value = next.value;
+            codeInput.selectionStart = next.start;
+            codeInput.selectionEnd = next.end;
+            updateLineNumbers();
+            saveToLocalStorage();
+        }
+        return;
+    }
+
     if (e.key === 'Tab') {
         e.preventDefault();
+        pushUndo();
         const start = codeInput.selectionStart;
         const end = codeInput.selectionEnd;
-        codeInput.value = codeInput.value.substring(0, start) + '        ' + codeInput.value.substring(end);
-        codeInput.selectionStart = codeInput.selectionEnd = start + 8;
+        const val = codeInput.value;
+        const indent = '        '; // 8 spaces
+
+        if (e.shiftKey) {
+            // Shift+Tab: unindent selected lines or current line
+            const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+            const lineEnd = end === start ? (val.indexOf('\n', end) === -1 ? val.length : val.indexOf('\n', end)) : (val.indexOf('\n', end - 1) === -1 ? val.length : val.indexOf('\n', end - 1));
+            const before = val.substring(0, lineStart);
+            const block = val.substring(lineStart, lineEnd);
+            const after = val.substring(lineEnd);
+            const lines = block.split('\n');
+            let removed = 0;
+            const newLines = lines.map(line => {
+                let r = 0;
+                while (r < 8 && r < line.length && line[r] === ' ') r++;
+                if (r > 0) removed += r;
+                return line.substring(r);
+            });
+            codeInput.value = before + newLines.join('\n') + after;
+            codeInput.selectionStart = Math.max(lineStart, start - (lines[0].length - newLines[0].length));
+            codeInput.selectionEnd = Math.max(codeInput.selectionStart, end - removed);
+        } else if (start !== end) {
+            // Tab with selection: indent all selected lines
+            const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+            const before = val.substring(0, lineStart);
+            const block = val.substring(lineStart, end);
+            const after = val.substring(end);
+            const lines = block.split('\n');
+            const newBlock = lines.map(l => indent + l).join('\n');
+            codeInput.value = before + newBlock + after;
+            codeInput.selectionStart = start + 8;
+            codeInput.selectionEnd = end + lines.length * 8;
+        } else {
+            // Tab with no selection: insert spaces
+            codeInput.value = val.substring(0, start) + indent + val.substring(end);
+            codeInput.selectionStart = codeInput.selectionEnd = start + 8;
+        }
         updateLineNumbers();
+        saveToLocalStorage();
+        return;
     }
+
+    // Snapshot undo on typing
+    scheduleUndoSnapshot();
+}
+
+function handleTab(e) {
+    handleKeydown(e);
 }
 
 function getCode() {
@@ -240,8 +346,11 @@ function setupSave() {
         btnSave.addEventListener('click', async () => {
             const user = await checkAuthAndUpdateNav();
             if (!user) {
-                bmcAlert('Please log in to save programs.', 'warning');
-                window.location.href = '/login';
+                // Not logged in — save to localStorage
+                const code = getCode();
+                if (!code.trim()) { bmcAlert('Nothing to save.', 'warning'); return; }
+                localStorage.setItem('bmc_autosave', code);
+                bmcAlert('Code saved locally to your browser! Log in to save to the cloud.', 'success');
                 return;
             }
             selectedExisting = '';
@@ -436,6 +545,5 @@ function setupAsmExport() {
 
 document.addEventListener('DOMContentLoaded', () => {
     setupSave();
-    setupExport();
     setupAsmExport();
 });
