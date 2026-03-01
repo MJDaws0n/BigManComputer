@@ -1,6 +1,8 @@
-# Git directories (especially from cloned lib repos)
+# Git directories
 .git
-lib/*/.git
+
+# Nox packages (installed via nox pull in Docker)
+lib/
 
 # Build artifacts (rebuilt in container)
 build/
