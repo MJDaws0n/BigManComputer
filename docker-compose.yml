@@ -3,8 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    expose:
-      - "${BMC_PORT:-8080}"
+    network_mode: host
     volumes:
       - bmc-data:/app/data
     restart: unless-stopped
