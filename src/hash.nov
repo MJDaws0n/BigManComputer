@@ -1,8 +1,6 @@
-// ---------------------------------------------------------------------------
 // hash - SHA-256 password hashing (NIST FIPS 180-4)
-// Uses single SHA-256 calls (no key stretching) to avoid heap exhaustion
-// in forked processes. Novus has no GC so repeated array allocations corrupt.
-// ---------------------------------------------------------------------------
+// Single SHA-256 call, no key stretching - avoids heap corruption
+// in forked processes (Novus has no GC).
 
 module hash;
 
@@ -74,9 +72,7 @@ fn hex8(val: i64) -> str {
            hex_nibble((v >> 4) & 15) + hex_nibble(v & 15);
 }
 
-// ---------------------------------------------------------------------------
 // SHA-256 hash - NIST FIPS 180-4 compliant
-// ---------------------------------------------------------------------------
 
 fn sha256(msg: str) -> str {
     let msg_len: i32 = len(msg);
@@ -143,36 +139,28 @@ fn sha256(msg: str) -> str {
            hex8(h4) + hex8(h5) + hex8(h6) + hex8(h7);
 }
 
-// ---------------------------------------------------------------------------
 // Generate a salt from username (deterministic but unique per user)
-// ---------------------------------------------------------------------------
 
 fn make_salt(username: str) -> str {
     let hval: str = sha256("bmc_salt_" + username + "_pepper_2024");
     return substr_len(hval, 0, 16);
 }
 
-// ---------------------------------------------------------------------------
 // Hash password: SHA-256(salt + pepper + password)
 // Single call to avoid heap exhaustion from array allocations in Novus
-// ---------------------------------------------------------------------------
 
 fn hash_password(password: str, salt: str) -> str {
     return sha256(salt + ":bmc_pepper_2024:" + password);
 }
 
-// ---------------------------------------------------------------------------
 // Verify a password against a stored hash
-// ---------------------------------------------------------------------------
 
 fn verify_password(password: str, salt: str, stored_hash: str) -> bool {
     let computed: str = hash_password(password, salt);
     return computed == stored_hash;
 }
 
-// ---------------------------------------------------------------------------
 // Generate a session token from username + timestamp
-// ---------------------------------------------------------------------------
 
 fn generate_session_token(username: str, timestamp: str) -> str {
     return sha256(username + ":" + timestamp + ":bmc_session_secret_2024");

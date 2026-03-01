@@ -1,4 +1,3 @@
-// ---------------------------------------------------------------------------
 // bmc/vm - Big Man Computer Virtual Machine
 //
 // Simulates a simple CPU with:
@@ -6,7 +5,6 @@
 //   100 memory locations (0-99)
 //
 // The VM state is encoded as a string for easy transport via HTTP.
-// ---------------------------------------------------------------------------
 
 module bmc_vm;
 
@@ -14,14 +12,12 @@ import ../../lib/std/main;
 import parser;
 import ../db;
 
-// ---------------------------------------------------------------------------
 // VM State encoding/decoding
 //
 // State string format (pipe-separated):
 //   acc|pc|mar|mdr|cir|sr|halted|mem0,mem1,...,mem99|inst_count|op0,op1,...|operand0,operand1,...|output|input_buf|error
 //
 // SR flags: 0=none, 1=zero, 2=positive, 3=negative
-// ---------------------------------------------------------------------------
 
 fn vm_create(parsed: str) -> str {
     // parsed format: "OK|inst_count|opcodes|operands"
@@ -100,9 +96,7 @@ fn vm_create(parsed: str) -> str {
     return state;
 }
 
-// ---------------------------------------------------------------------------
 // Get a field from the VM state
-// ---------------------------------------------------------------------------
 
 fn vm_get_field(state: str, index: i32) -> str {
     return db_get_field(state, index);
@@ -123,17 +117,13 @@ fn vm_get_output(state: str) -> str { return str_replace(vm_get_field(state, 11)
 fn vm_get_input(state: str) -> str { return str_replace(vm_get_field(state, 12), "%%PIPE%%", "|"); }
 fn vm_get_error(state: str) -> str { return str_replace(vm_get_field(state, 13), "%%PIPE%%", "|"); }
 
-// ---------------------------------------------------------------------------
 // Set a field in the VM state
-// ---------------------------------------------------------------------------
 
 fn vm_set_field(state: str, index: i32, value: str) -> str {
     return db_set_field(state, index, value);
 }
 
-// ---------------------------------------------------------------------------
 // Get memory value at address
-// ---------------------------------------------------------------------------
 
 fn vm_mem_get(mem_str: str, addr: i32) -> i32 {
     let idx: i32 = 0;
@@ -150,9 +140,7 @@ fn vm_mem_get(mem_str: str, addr: i32) -> i32 {
     return str_to_i32(substr_len(mem_str, start, pos - start));
 }
 
-// ---------------------------------------------------------------------------
 // Set memory value at address
-// ---------------------------------------------------------------------------
 
 fn vm_mem_set(mem_str: str, addr: i32, value: i32) -> str {
     let result: str = "";
@@ -197,9 +185,7 @@ fn vm_mem_set(mem_str: str, addr: i32, value: i32) -> str {
     return result;
 }
 
-// ---------------------------------------------------------------------------
 // Get opcode at instruction index
-// ---------------------------------------------------------------------------
 
 fn vm_get_opcode_at(opcodes_str: str, index: i32) -> i32 {
     let idx: i32 = 0;
@@ -220,9 +206,7 @@ fn vm_get_operand_at(operands_str: str, index: i32) -> i32 {
     return vm_get_opcode_at(operands_str, index);
 }
 
-// ---------------------------------------------------------------------------
 // Update status register based on accumulator value
-// ---------------------------------------------------------------------------
 
 fn calc_sr(acc: i32) -> i32 {
     if (acc == 0) { return 1; }
@@ -237,10 +221,8 @@ fn sr_to_str(sr: i32) -> str {
     return "-";
 }
 
-// ---------------------------------------------------------------------------
 // Execute one instruction (step)
 // Returns updated state string
-// ---------------------------------------------------------------------------
 
 fn vm_step(state: str) -> str {
     if (vm_is_halted(state)) { return state; }
@@ -381,10 +363,8 @@ fn vm_step(state: str) -> str {
     return new_state;
 }
 
-// ---------------------------------------------------------------------------
 // Bitwise operations via arithmetic (Novus has no bitwise ops natively
 // on all platforms, so we simulate them)
-// ---------------------------------------------------------------------------
 
 fn bmc_bitwise_and(a: i32, b: i32) -> i32 {
     let result: i32 = 0;
@@ -418,9 +398,7 @@ fn bmc_bitwise_or(a: i32, b: i32) -> i32 {
     return result;
 }
 
-// ---------------------------------------------------------------------------
 // Run program to completion (max steps to prevent infinite loops)
-// ---------------------------------------------------------------------------
 
 fn vm_run(state: str, max_steps: i32) -> str {
     let steps: i32 = 0;
@@ -438,9 +416,7 @@ fn vm_run(state: str, max_steps: i32) -> str {
     return state;
 }
 
-// ---------------------------------------------------------------------------
 // Provide input to the VM (append to input buffer)
-// ---------------------------------------------------------------------------
 
 fn vm_provide_input(state: str, value: str) -> str {
     let current_input: str = vm_get_input(state);
@@ -458,9 +434,7 @@ fn vm_provide_input(state: str, value: str) -> str {
     return state;
 }
 
-// ---------------------------------------------------------------------------
 // Convert VM state to JSON for the frontend
-// ---------------------------------------------------------------------------
 
 fn vm_state_to_json(state: str) -> str {
     let acc: i32 = vm_get_acc(state);

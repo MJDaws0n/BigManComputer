@@ -1,9 +1,6 @@
-// ---------------------------------------------------------------------------
-// db - Simple binary database library for Novus
-// Stores data in a pipe-delimited text format for simplicity and speed.
-// Each "table" is a file in the data/ directory.
+// db - Simple database library for Novus
+// Stores data in pipe-delimited text files in data/.
 // Records are newline-separated, fields are pipe-separated.
-// ---------------------------------------------------------------------------
 
 module db;
 
@@ -11,9 +8,7 @@ import ../lib/std/main;
 import ../lib/file_io/main;
 import ../lib/time/main;
 
-// ---------------------------------------------------------------------------
 // Initialise the database directory
-// ---------------------------------------------------------------------------
 
 fn db_init() -> void {
     if (!file_exists("data")) {
@@ -21,10 +16,8 @@ fn db_init() -> void {
     }
 }
 
-// ---------------------------------------------------------------------------
 // File locking for concurrent access safety (fork-per-request model)
 // Uses O_CREAT|O_EXCL for atomic lock file creation
-// ---------------------------------------------------------------------------
 
 fn db_lock(table: str) -> void {
     let lock_path: str = "data/" + table + ".lock";
@@ -49,25 +42,19 @@ fn db_unlock(table: str) -> void {
     file_delete(lock_path);
 }
 
-// ---------------------------------------------------------------------------
 // Get the file path for a table
-// ---------------------------------------------------------------------------
 
 fn db_table_path(table: str) -> str {
     return "data/" + table + ".db";
 }
 
-// ---------------------------------------------------------------------------
 // Check if a table exists
-// ---------------------------------------------------------------------------
 
 fn db_table_exists(table: str) -> bool {
     return file_exists(db_table_path(table));
 }
 
-// ---------------------------------------------------------------------------
 // Create a table (just creates an empty file)
-// ---------------------------------------------------------------------------
 
 fn db_create_table(table: str) -> void {
     if (!db_table_exists(table)) {
@@ -75,18 +62,14 @@ fn db_create_table(table: str) -> void {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Read all rows from a table as a single string
-// ---------------------------------------------------------------------------
 
 fn db_read_all(table: str) -> str {
     if (!db_table_exists(table)) { return ""; }
     return read_file(db_table_path(table));
 }
 
-// ---------------------------------------------------------------------------
 // Append a row to a table
-// ---------------------------------------------------------------------------
 
 fn db_append_row(table: str, row: str) -> void {
     db_lock(table);
@@ -94,9 +77,7 @@ fn db_append_row(table: str, row: str) -> void {
     db_unlock(table);
 }
 
-// ---------------------------------------------------------------------------
 // Write all data back to a table (full rewrite)
-// ---------------------------------------------------------------------------
 
 fn db_write_all(table: str, data: str) -> void {
     db_lock(table);
@@ -104,9 +85,7 @@ fn db_write_all(table: str, data: str) -> void {
     db_unlock(table);
 }
 
-// ---------------------------------------------------------------------------
 // Count rows in a table
-// ---------------------------------------------------------------------------
 
 fn db_count_rows(table: str) -> i32 {
     let data: str = db_read_all(table);
@@ -120,9 +99,7 @@ fn db_count_rows(table: str) -> i32 {
     return count;
 }
 
-// ---------------------------------------------------------------------------
 // Get a specific row by index (0-based)
-// ---------------------------------------------------------------------------
 
 fn db_get_row(table: str, index: i32) -> str {
     let data: str = db_read_all(table);
@@ -143,10 +120,8 @@ fn db_get_row(table: str, index: i32) -> str {
     return "";
 }
 
-// ---------------------------------------------------------------------------
 // Find a row where field at field_index matches value
 // Fields are pipe-separated. Returns the full row or "" if not found.
-// ---------------------------------------------------------------------------
 
 fn db_find_by_field(table: str, field_index: i32, value: str) -> str {
     let data: str = db_read_all(table);
@@ -170,9 +145,7 @@ fn db_find_by_field(table: str, field_index: i32, value: str) -> str {
     return "";
 }
 
-// ---------------------------------------------------------------------------
 // Get a field from a pipe-separated row
-// ---------------------------------------------------------------------------
 
 fn db_get_field(row: str, field_index: i32) -> str {
     let current: i32 = 0;
@@ -192,9 +165,7 @@ fn db_get_field(row: str, field_index: i32) -> str {
     return "";
 }
 
-// ---------------------------------------------------------------------------
 // Delete rows where field at field_index matches value
-// ---------------------------------------------------------------------------
 
 fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
     db_lock(table);
@@ -225,9 +196,7 @@ fn db_delete_by_field(table: str, field_index: i32, value: str) -> i32 {
     return deleted;
 }
 
-// ---------------------------------------------------------------------------
 // Update a field in rows matching a condition
-// ---------------------------------------------------------------------------
 
 fn db_update_field(table: str, match_field: i32, match_value: str, update_field: i32, new_value: str) -> i32 {
     db_lock(table);
@@ -260,9 +229,7 @@ fn db_update_field(table: str, match_field: i32, match_value: str, update_field:
     return updated;
 }
 
-// ---------------------------------------------------------------------------
 // Set a specific field in a pipe-separated row
-// ---------------------------------------------------------------------------
 
 fn db_set_field(row: str, field_index: i32, new_value: str) -> str {
     let result: str = "";
@@ -288,9 +255,7 @@ fn db_set_field(row: str, field_index: i32, new_value: str) -> str {
     return result;
 }
 
-// ---------------------------------------------------------------------------
 // Get all rows matching a field value (returns newline-separated)
-// ---------------------------------------------------------------------------
 
 fn db_find_all_by_field(table: str, field_index: i32, value: str) -> str {
     let data: str = db_read_all(table);
@@ -315,9 +280,7 @@ fn db_find_all_by_field(table: str, field_index: i32, value: str) -> str {
     return result;
 }
 
-// ---------------------------------------------------------------------------
 // Generate a simple unique ID based on timestamp + counter
-// ---------------------------------------------------------------------------
 
 fn db_generate_id() -> str {
     let t: i64 = get_time_us();

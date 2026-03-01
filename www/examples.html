@@ -122,8 +122,8 @@
     <div class="content-page">
         <h1>Example <span class="gradient-text">Programs</span></h1>
         <p class="examples-intro">
-            Explore these BMC assembly programs. Simple arithmetic to complex algorithms.
-            Click <strong>Open in Editor</strong> to load any example directly into the IDE and step through it instruction by instruction.
+            A collection of BMC assembly programs, from basic arithmetic to some properly complex stuff.
+            Click <strong>Open in Editor</strong> to load any of them straight into the editor and step through it.
         </p>
 
         <div class="examples-filter">
@@ -183,7 +183,7 @@ one:    DAT 1`
 {
     name: "Multiplication",
     difficulty: "medium",
-    desc: "Multiplies two input numbers using repeated addition — BMC has no hardware multiply.",
+    desc: "Multiplies two input numbers using repeated addition since BMC has no hardware multiply.",
     code: `; Multiply by Repeated Addition
         INP          ; Multiplier
         STA count
@@ -767,7 +767,7 @@ b128:   DAT 128`
     difficulty: "medium",
     desc: "Reads characters one at a time (as ASCII codes) and echoes them back. Enter 0 to stop. Try typing letters!",
     code: `; Echo characters until 0
-; Type a letter — it auto-converts to ASCII
+; Type a letter - it auto-converts to ASCII
 loop:   INP          ; Get char (or ASCII code)
         BRZ done     ; 0 = stop
         OTC          ; Output as character

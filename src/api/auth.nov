@@ -1,7 +1,4 @@
-// ---------------------------------------------------------------------------
-// api/auth - Authentication API endpoints
-// Handles signup, login, logout, session validation, account deletion
-// ---------------------------------------------------------------------------
+// api/auth - Authentication API endpoints (signup, login, logout, sessions, account deletion)
 
 module api_auth;
 
@@ -15,10 +12,8 @@ import ../../lib/file_io/main;
 import ../db;
 import ../hash;
 
-// ---------------------------------------------------------------------------
 // Read a value from the .env file by key name
 // Returns "" if not found
-// ---------------------------------------------------------------------------
 
 fn read_env_key(key: str) -> str {
     let content: str = read_file(".env");
@@ -34,11 +29,9 @@ fn read_env_key(key: str) -> str {
     return str_trim(substr_len(content, vstart, vend - vstart));
 }
 
-// ---------------------------------------------------------------------------
 // Validate AutoGate captcha token
 // POSTs to https://autogate.mjdawson.net/api/validate
 // Returns true if valid, or true if captcha not configured
-// ---------------------------------------------------------------------------
 
 fn validate_captcha(token: str) -> bool {
     let private_key: str = read_env_key("AUTOGATE_PRIVATE");
@@ -76,11 +69,9 @@ fn validate_captcha(token: str) -> bool {
     return false;
 }
 
-// ---------------------------------------------------------------------------
 // Initialise auth tables
 // Users table: username|password_hash|salt|created_at
 // Sessions table: token|username|created_at|expires_at
-// ---------------------------------------------------------------------------
 
 fn auth_init() -> void {
     db_create_table("users");
@@ -88,9 +79,7 @@ fn auth_init() -> void {
     db_create_table("consent");
 }
 
-// ---------------------------------------------------------------------------
 // Extract session token from Cookie header
-// ---------------------------------------------------------------------------
 
 fn get_session_cookie(request: str) -> str {
     let pos: i32 = str_find(request, "Cookie:");
@@ -112,9 +101,7 @@ fn get_session_cookie(request: str) -> str {
     return str_trim(substr_len(token_start, 0, semi));
 }
 
-// ---------------------------------------------------------------------------
 // Validate session and return username or ""
-// ---------------------------------------------------------------------------
 
 fn validate_session(token: str) -> str {
     if (len(token) == 0) { return ""; }
@@ -123,10 +110,8 @@ fn validate_session(token: str) -> str {
     return db_get_field(row, 1);
 }
 
-// ---------------------------------------------------------------------------
 // Handle signup: POST /api/signup
 // Body: {"username":"...","password":"..."}
-// ---------------------------------------------------------------------------
 
 fn handle_signup(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -194,9 +179,7 @@ fn handle_signup(request: str, client_fd: i32) -> void {
     api_send_json_cookie(client_fd, 200, resp, cookie);
 }
 
-// ---------------------------------------------------------------------------
 // Handle login: POST /api/login
-// ---------------------------------------------------------------------------
 
 fn handle_login(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -234,9 +217,7 @@ fn handle_login(request: str, client_fd: i32) -> void {
     api_send_json_cookie(client_fd, 200, resp, cookie);
 }
 
-// ---------------------------------------------------------------------------
 // Handle logout: POST /api/logout
-// ---------------------------------------------------------------------------
 
 fn handle_logout(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -248,9 +229,7 @@ fn handle_logout(request: str, client_fd: i32) -> void {
     api_send_json_cookie(client_fd, 200, resp, cookie);
 }
 
-// ---------------------------------------------------------------------------
 // Handle session check: GET /api/me
-// ---------------------------------------------------------------------------
 
 fn handle_me(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -263,9 +242,7 @@ fn handle_me(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, resp);
 }
 
-// ---------------------------------------------------------------------------
 // GDPR: Delete account and all data: DELETE /api/account
-// ---------------------------------------------------------------------------
 
 fn handle_delete_account(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -285,9 +262,7 @@ fn handle_delete_account(request: str, client_fd: i32) -> void {
     api_send_json_cookie(client_fd, 200, "{\"ok\":true}", cookie);
 }
 
-// ---------------------------------------------------------------------------
 // GDPR: Export user data: GET /api/export-data
-// ---------------------------------------------------------------------------
 
 fn handle_export_data(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -326,9 +301,7 @@ fn handle_export_data(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, data);
 }
 
-// ---------------------------------------------------------------------------
 // GDPR: Record consent: POST /api/consent
-// ---------------------------------------------------------------------------
 
 fn handle_consent(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -342,9 +315,7 @@ fn handle_consent(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, "{\"ok\":true}");
 }
 
-// ---------------------------------------------------------------------------
 // HTTP helper: send JSON response with cookie
-// ---------------------------------------------------------------------------
 
 fn api_send_json_cookie(client_fd: i32, status_code: i32, body: str, cookie: str) -> void {
     let status_line: str = "HTTP/1.1 " + i32_to_str(status_code) + " OK";
@@ -363,9 +334,7 @@ fn api_send_json_cookie(client_fd: i32, status_code: i32, body: str, cookie: str
     net_write_str(client_fd, response);
 }
 
-// ---------------------------------------------------------------------------
 // HTTP helper: send JSON response
-// ---------------------------------------------------------------------------
 
 fn api_send_json(client_fd: i32, status_code: i32, body: str) -> void {
     let status_line: str = "HTTP/1.1 " + i32_to_str(status_code) + " OK";
@@ -386,9 +355,7 @@ fn api_send_json(client_fd: i32, status_code: i32, body: str) -> void {
     net_write_str(client_fd, response);
 }
 
-// ---------------------------------------------------------------------------
 // HTTP helper: get body from raw request
-// ---------------------------------------------------------------------------
 
 fn api_get_body(request: str) -> str {
     let sep: i32 = str_find(request, "\n\n");

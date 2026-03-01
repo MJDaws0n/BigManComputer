@@ -1,7 +1,5 @@
-// ============================================================================
-// BMC - CPU Simulator & Visualization (Client-Side)
-// Uses BMC.parse/step/run from bmcvm.js — no network calls for execution.
-// ============================================================================
+// BMC - CPU Simulator & Visualisation (Client-Side)
+// Uses BMC.parse/step/run from bmcvm.js - no network calls for execution.
 
 let vm = null;
 let vmState = null;
@@ -118,13 +116,13 @@ function stepProgram() {
 
     if (vm.halted) {
         setStatus('halted', '■ Halted');
-        addLog('Step ' + stepCount + ': HLT — Program halted');
+        addLog('Step ' + stepCount + ': HLT - Program halted');
         enableControls(false);
         stopRunning();
     } else if (vm.error === 'WAITING_INPUT') {
         wasRunningBeforeInput = isRunning;
         setStatus('waiting', '⏸ Waiting for input');
-        addLog('Step ' + stepCount + ': INP — Waiting for input');
+        addLog('Step ' + stepCount + ': INP - Waiting for input');
         showInputBar(true);
         stopRunning();
     } else {

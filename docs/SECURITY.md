@@ -1,39 +1,39 @@
 # BMC Security
 
-This document describes the security measures implemented in the Big Man Computer (BMC) web application.
+How security works in Big Man Computer (BMC).
 
 ## Authentication
 
 ### Password Storage
 - Passwords are **never stored in plaintext**.
-- All passwords are hashed using **SHA-256** with a per-user random salt and a server-side pepper.
+- All passwords are hashed with **SHA-256** using a per-user random salt and a server-side pepper.
 - The hash format is `salt:hash`, where `salt` is a 16-character random string and `hash` is the SHA-256 digest of `salt + pepper + password`.
-- SHA-256 is implemented in pure Novus following NIST FIPS 180-4.
+- SHA-256 is written in pure Novus, following NIST FIPS 180-4.
 
 ### Session Management
-- Sessions use cryptographically random tokens (64-character hex strings generated from system entropy via `/dev/urandom`).
+- Sessions use cryptographically random tokens (64-character hex strings generated from `/dev/urandom`).
 - Session cookies are set with:
-  - `HttpOnly` — prevents JavaScript access (XSS protection)
-  - `SameSite=Strict` — prevents CSRF attacks
-  - `Path=/` — scoped to the application
+  - `HttpOnly` - stops JavaScript from reading them (XSS protection)
+  - `SameSite=Strict` - stops CSRF attacks
+  - `Path=/` - scoped to the application
 - Sessions are stored server-side in a flat-file database.
 
 ### Input Validation
-- **Usernames**: 3–32 alphanumeric characters only. No special characters, pipes, slashes, or newlines allowed.
-- **Passwords**: 6–128 characters. No length-based denial-of-service possible.
-- The pipe character `|` is explicitly rejected in usernames as it is the database field delimiter.
+- **Usernames**: 3-32 alphanumeric characters only. No special characters, pipes, slashes, or newlines.
+- **Passwords**: 6-128 characters. No length-based DoS possible.
+- The pipe character `|` is rejected in usernames since it's the database field delimiter.
 
 ## Web Server Security
 
 ### Path Traversal Protection
 - All static file requests are checked for `..` sequences and backslash characters.
-- Requests containing path traversal patterns receive a `404` response.
-- Source code files (`main.nov`, `src/`, `lib/`, `data/`) are not accessible via the web server — only the `www/` directory is served.
+- Requests with path traversal patterns get a `404` response.
+- Source code files (`main.nov`, `src/`, `lib/`, `data/`) aren't accessible via the web server. Only the `www/` directory is served.
 
 ### Request Handling
-- Each HTTP request is handled in a **forked child process**, providing process-level isolation.
-- Malformed requests (missing method, missing path, binary garbage) are handled gracefully without crashing the server.
-- The parent process uses non-blocking `waitpid` (WNOHANG) to reap child processes without blocking request handling.
+- Each HTTP request is handled in a **forked child process**, giving you process-level isolation.
+- Malformed requests (missing method, missing path, binary junk) are handled gracefully without crashing the server.
+- The parent process uses non-blocking `waitpid` (WNOHANG) to reap child processes without blocking.
 
 ### Header Injection
 - CRLF injection attempts in URLs are rejected.
@@ -42,21 +42,21 @@ This document describes the security measures implemented in the Big Man Compute
 ### Denial of Service Mitigations
 - Very long URLs (10KB+) are handled gracefully.
 - Oversized POST bodies (300KB+) are processed without crashing.
-- Empty and partial connections do not block the server.
+- Empty and partial connections don't block the server.
 - Rapid sequential requests are handled correctly.
 
 ## Database Security
 
 ### File-Based Database
 - User data is stored in flat files with pipe-delimited fields.
-- **File locking** is implemented using atomic `O_CREAT|O_EXCL` lockfiles to prevent concurrent write corruption.
-- Lock acquisition has a timeout (200 attempts × 5ms = 1 second) to prevent deadlocks.
+- **File locking** uses atomic `O_CREAT|O_EXCL` lockfiles to prevent concurrent write corruption.
+- Lock acquisition has a timeout (200 attempts x 5ms = 1 second) to avoid deadlocks.
 - Stale locks are force-released after timeout.
 
 ### Data Isolation
 - Users can only access their own saved programs.
-- All API endpoints that access user data require valid session authentication.
-- Programs are stored with their owner's username — no cross-user access is possible.
+- All API endpoints that access user data require a valid session.
+- Programs are stored with their owner's username, so there's no cross-user access.
 
 ### Newline & Delimiter Escaping
 - Newlines in saved program code are escaped as `%%NL%%` and carriage returns as `%%CR%%` to prevent field injection in the pipe-delimited database.
@@ -64,43 +64,43 @@ This document describes the security measures implemented in the Big Man Compute
 ## GDPR Compliance
 
 ### Data Minimisation
-- Only the minimum data required is collected: username, hashed password, and saved programs.
+- Only the bare minimum data is collected: username, hashed password, and saved programs.
 - No email addresses, IP addresses, or tracking data is collected.
-- No third-party analytics or tracking scripts are used.
+- No third-party analytics or tracking scripts.
 
 ### User Rights
-- **Right to Access**: Users can export all their data via the `/api/me/export` endpoint.
+- **Right to Access**: Users can export all their data via `/api/me/export`.
 - **Right to Erasure**: Users can delete individual programs. Account deletion removes all associated data.
-- **Transparency**: The privacy policy clearly explains what data is collected and why.
+- **Transparency**: The privacy policy spells out what data is collected and why.
 
 ### Cookies
-- Only **essential cookies** are used (session authentication).
+- Only **essential cookies** are used (session auth).
 - No tracking or marketing cookies.
-- A cookie consent banner informs users about cookie usage.
+- A cookie consent banner lets users know about cookie usage.
 
 ## Cross-Site Scripting (XSS) Prevention
 
-- All user-generated content displayed in the UI is escaped using `escapeHtml()` which converts `&`, `<`, `>`, `"`, and `'` to HTML entities.
-- The code editor uses a `<textarea>` element which does not render HTML.
-- Session cookies have `HttpOnly` flag, preventing JavaScript access to session tokens.
+- All user-generated content shown in the UI is escaped with `escapeHtml()`, which converts `&`, `<`, `>`, `"`, and `'` to HTML entities.
+- The code editor uses a `<textarea>` which doesn't render HTML.
+- Session cookies have `HttpOnly`, so JavaScript can't touch session tokens.
 
 ## Cross-Site Request Forgery (CSRF)
 
-- Session cookies use `SameSite=Strict`, preventing the browser from sending cookies with cross-origin requests.
+- Session cookies use `SameSite=Strict`, so the browser won't send cookies with cross-origin requests.
 - All state-changing operations require `POST` requests with JSON bodies.
 
 ## Shell Injection Prevention
 
-- The export functionality compiles user code through the Novus compiler. File paths are sanitised before use.
+- The export feature compiles user code through the Novus compiler. File paths are sanitised before use.
 - No user input is passed directly to shell commands (`exec` or `system` calls).
 
 ## Testing
 
-BMC includes comprehensive security testing:
+BMC has a solid set of security tests:
 - **76 security tests** across 18 categories (`tests/test_security.sh`)
 - **48 functional tests** (`tests/test_all.sh`)
 
-Test categories include:
+Test categories:
 1. Path traversal (11 tests)
 2. HTTP header injection (3 tests)
 3. Request size / DoS resilience (5 tests)
@@ -122,11 +122,11 @@ Test categories include:
 
 ## Architecture Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| Fork-per-request | Process isolation prevents one request from affecting others |
-| Non-blocking waitpid | Prevents server hangs from zombie processes |
-| File-based locking | Ensures database consistency under concurrent access |
-| SHA-256 (single round) | Cryptographic security without heap corruption issues in forked processes |
+| Decision | Why |
+|----------|-----|
+| Fork-per-request | Process isolation means one request can't affect others |
+| Non-blocking waitpid | Stops server hangs from zombie processes |
+| File-based locking | Keeps the database consistent under concurrent access |
+| SHA-256 (single round) | Cryptographic security without hitting heap corruption in forked processes |
 | Chunked file serving | O(n) performance, prevents slow-loris on large static files |
-| Client-side VM | Simulation runs in the browser — no server resources consumed per step |
+| Client-side VM | Simulation runs in the browser, no server resources used per step |

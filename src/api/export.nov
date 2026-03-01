@@ -1,8 +1,6 @@
-// ---------------------------------------------------------------------------
 // api/export - Export BMC programs as compiled executables
 // Compiles BMC code to Novus source, then to a native binary
 // Uses fork() to avoid blocking the server during compilation
-// ---------------------------------------------------------------------------
 
 module api_export;
 
@@ -15,10 +13,8 @@ import ../../lib/time/main;
 import ../bmc/compiler;
 import ../api/auth;
 
-// ---------------------------------------------------------------------------
 // POST /api/export - Compile and download a BMC program
 // Body: {"code":"...","name":"my_program"}
-// ---------------------------------------------------------------------------
 
 fn handle_export(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -101,10 +97,8 @@ fn handle_export(request: str, client_fd: i32) -> void {
     file_delete(bin_path);
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/export/source - Get the Novus source without compiling
 // Body: {"code":"..."}
-// ---------------------------------------------------------------------------
 
 fn handle_export_source(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);

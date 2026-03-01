@@ -1,8 +1,6 @@
-// ============================================================================
 // BMC Client-Side Virtual Machine
-// Parses and executes BMC assembly entirely in the browser.
-// No network calls needed for run/step — only export/save/load use the server.
-// ============================================================================
+// Parses and runs BMC assembly entirely in the browser.
+// No network calls needed for run/step - only export/save/load use the server.
 
 const BMC = (() => {
 
@@ -254,7 +252,7 @@ const BMC = (() => {
                 vm.acc = 999 - vm.acc;
                 break;
             case OP.DAT:
-                // Data cell — skip over it
+                // Data cell - skip over it
                 break;
             default:
                 vm.error = 'Unknown opcode: ' + opcode;

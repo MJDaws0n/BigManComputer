@@ -1,6 +1,6 @@
 # BMC Assembly Syntax Reference
 
-Big Man Computer (BMC) is an enhanced version of the Little Man Computer (LMC) instruction set. It provides a simple assembly language for learning about CPU architecture and instruction execution.
+Big Man Computer (BMC) is a improved version of the Little Man Computer (LMC) instruction set. It's a simple assembly language for learning how CPUs work.
 
 ## Assembly Format
 
@@ -10,7 +10,7 @@ Big Man Computer (BMC) is an enhanced version of the Little Man Computer (LMC) i
 
 - **Labels** end with a colon (e.g., `loop:`) and mark memory addresses for branching
 - **Opcodes** are case-insensitive (e.g., `ADD`, `add`, `Add` are equivalent)
-- **Operands** are either memory addresses (0–99) or label references
+- **Operands** are either memory addresses (0-99) or label references
 - **Comments** start with `;` and continue to the end of the line
 - Blank lines are ignored
 

@@ -1,12 +1,10 @@
-// ---------------------------------------------------------------------------
 // Big Man Computer (BMC) - Main Entry Point
 //
-// An LMC-inspired CPU simulator with a web-based IDE and visualizer.
-// Built in Novus, the language it teaches about.
+// LMC-inspired CPU simulator with a web IDE and visualiser.
+// Built in Novus.
 //
 // Usage: ./bmc [--port PORT] [--debug]
 // Default port: 8080
-// ---------------------------------------------------------------------------
 
 module BigManComputer;
 
@@ -28,9 +26,7 @@ import src/api/simulator;
 import src/api/programs;
 import src/api/export;
 
-// ---------------------------------------------------------------------------
 // Configuration
-// ---------------------------------------------------------------------------
 
 // waitpid_nohang() is now provided by the process library for all platforms
 
@@ -38,9 +34,7 @@ fn get_bmc_version() -> str {
     return "1.0.0";
 }
 
-// ---------------------------------------------------------------------------
 // Parse command line arguments
-// ---------------------------------------------------------------------------
 
 fn parse_port(argc: i32, argv: u64) -> i32 {
     let port: i32 = 8080;
@@ -70,10 +64,8 @@ fn parse_debug(argc: i32, argv: u64) -> bool {
     return false;
 }
 
-// ---------------------------------------------------------------------------
 // Serve static files from www/ directory
 // Uses direct file_read + net_write to bypass slow copy_bytes in read_file
-// ---------------------------------------------------------------------------
 
 fn serve_static_file(client_fd: i32, path: str) -> bool {
     // Block path traversal attempts
@@ -129,9 +121,7 @@ fn serve_static_file(client_fd: i32, path: str) -> bool {
     return true;
 }
 
-// ---------------------------------------------------------------------------
 // Send 404 response
-// ---------------------------------------------------------------------------
 
 fn send_404(client_fd: i32) -> void {
     let body: str = "<html><head><title>404 - BMC</title><style>body{font-family:system-ui;background:#0a0a0f;color:#e0e0e0;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}div{text-align:center}h1{font-size:6rem;color:#6c63ff;margin:0}p{font-size:1.2rem;color:#888}a{color:#6c63ff;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><div><h1>404</h1><p>Page not found</p><p><a href=\"/\">Go to Big Man Computer</a></p></div></body></html>";
@@ -144,9 +134,7 @@ fn send_404(client_fd: i32) -> void {
     net_write_str(client_fd, response);
 }
 
-// ---------------------------------------------------------------------------
 // Handle CORS preflight
-// ---------------------------------------------------------------------------
 
 fn handle_cors(client_fd: i32) -> void {
     let response: str = "HTTP/1.1 204 No Content\r\n";
@@ -159,9 +147,7 @@ fn handle_cors(client_fd: i32) -> void {
     net_write_str(client_fd, response);
 }
 
-// ---------------------------------------------------------------------------
 // Route an incoming request
-// ---------------------------------------------------------------------------
 
 fn handle_request(client_fd: i32, request: str, debug: bool) -> void {
     let method: str = http_get_method(request);
@@ -220,9 +206,7 @@ fn handle_request(client_fd: i32, request: str, debug: bool) -> void {
     send_404(client_fd);
 }
 
-// ---------------------------------------------------------------------------
 // Print startup banner
-// ---------------------------------------------------------------------------
 
 fn print_banner() -> void {
     print("");
@@ -238,9 +222,7 @@ fn print_banner() -> void {
     print("");
 }
 
-// ---------------------------------------------------------------------------
 // Main entry point
-// ---------------------------------------------------------------------------
 
 fn main(argc: i32, argv: u64) -> i32 {
     net_ignore_sigpipe();

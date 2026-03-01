@@ -1,6 +1,4 @@
-// ============================================================================
 // BMC - Code Editor with Syntax Highlighting
-// ============================================================================
 
 const EXAMPLES = {
     add: `; Add Two Numbers
@@ -300,7 +298,7 @@ function setupSave() {
     let selectedExisting = '';
     let userPrograms = [];
 
-    // Listen for existing program dropdown changes — fill the name input
+    // Listen for existing program dropdown changes - fill the name input
     const saveExistingDropdown = document.getElementById('save-existing-dropdown');
     if (saveExistingDropdown) {
         saveExistingDropdown.addEventListener('dropdown-change', (e) => {
@@ -346,7 +344,7 @@ function setupSave() {
         btnSave.addEventListener('click', async () => {
             const user = await checkAuthAndUpdateNav();
             if (!user) {
-                // Not logged in — save to localStorage
+                // Not logged in - save to localStorage
                 const code = getCode();
                 if (!code.trim()) { bmcAlert('Nothing to save.', 'warning'); return; }
                 localStorage.setItem('bmc_autosave', code);

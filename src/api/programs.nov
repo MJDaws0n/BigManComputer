@@ -1,8 +1,6 @@
-// ---------------------------------------------------------------------------
 // api/programs - Program CRUD API endpoints
 // Save, load, list, delete BMC programs for logged-in users
 // Programs table: username|name|code|created_at|updated_at
-// ---------------------------------------------------------------------------
 
 module api_programs;
 
@@ -13,18 +11,14 @@ import ../../lib/time/main;
 import ../db;
 import ../api/auth;
 
-// ---------------------------------------------------------------------------
 // Initialise programs table
-// ---------------------------------------------------------------------------
 
 fn programs_init() -> void {
     db_create_table("programs");
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/programs/save - Save or update a program
 // Body: {"name":"...", "code":"..."}
-// ---------------------------------------------------------------------------
 
 fn handle_save_program(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -107,9 +101,7 @@ fn handle_save_program(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, "{\"ok\":true}");
 }
 
-// ---------------------------------------------------------------------------
 // GET /api/programs/list - List all programs for logged-in user
-// ---------------------------------------------------------------------------
 
 fn handle_list_programs(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);
@@ -151,9 +143,7 @@ fn handle_list_programs(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, json);
 }
 
-// ---------------------------------------------------------------------------
 // GET /api/programs/load?name=... - Load a specific program
-// ---------------------------------------------------------------------------
 
 fn handle_load_program(request: str, client_fd: i32, path: str) -> void {
     let token: str = get_session_cookie(request);
@@ -201,10 +191,8 @@ fn handle_load_program(request: str, client_fd: i32, path: str) -> void {
     api_send_json(client_fd, 404, "{\"ok\":false,\"error\":\"Program not found\"}");
 }
 
-// ---------------------------------------------------------------------------
 // DELETE /api/programs/delete - Delete a program
 // Body: {"name":"..."}
-// ---------------------------------------------------------------------------
 
 fn handle_delete_program(request: str, client_fd: i32) -> void {
     let token: str = get_session_cookie(request);

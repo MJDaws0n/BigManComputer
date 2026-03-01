@@ -1,7 +1,5 @@
-// ---------------------------------------------------------------------------
 // api/simulator - BMC Simulator API endpoints
 // Handles loading, stepping, running, resetting, and providing input
-// ---------------------------------------------------------------------------
 
 module api_simulator;
 
@@ -14,10 +12,8 @@ import ../bmc/parser;
 import ../bmc/vm;
 import ../api/auth;
 
-// ---------------------------------------------------------------------------
 // Active VM sessions - stored in files to avoid global variable issues
 // State files: data/sim_<key>.state
-// ---------------------------------------------------------------------------
 
 fn sim_state_path(key: str) -> str {
     return "data/sim_" + key + ".state";
@@ -40,9 +36,7 @@ fn sanitise_sim_key(key: str) -> str {
     return result;
 }
 
-// ---------------------------------------------------------------------------
 // Get or create a session key from the request
-// ---------------------------------------------------------------------------
 
 fn get_sim_key(request: str) -> str {
     let body: str = api_get_body(request);
@@ -56,17 +50,13 @@ fn get_sim_key(request: str) -> str {
     return sanitise_sim_key(token);
 }
 
-// ---------------------------------------------------------------------------
 // Store a VM state for a session
-// ---------------------------------------------------------------------------
 
 fn store_sim(key: str, state: str) -> void {
     write_file(sim_state_path(key), state);
 }
 
-// ---------------------------------------------------------------------------
 // Load a VM state for a session, returns "" if not found
-// ---------------------------------------------------------------------------
 
 fn load_sim(key: str) -> str {
     let path: str = sim_state_path(key);
@@ -74,10 +64,8 @@ fn load_sim(key: str) -> str {
     return read_file(path);
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/load - Load and parse a BMC program
 // Body: {"code":"..."}
-// ---------------------------------------------------------------------------
 
 fn handle_load(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -113,9 +101,7 @@ fn handle_load(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, json);
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/step - Execute one instruction
-// ---------------------------------------------------------------------------
 
 fn handle_step(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -145,9 +131,7 @@ fn handle_step(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, json);
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/run - Run program to completion (max 10000 steps)
-// ---------------------------------------------------------------------------
 
 fn handle_run(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -177,9 +161,7 @@ fn handle_run(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, json);
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/reset - Reset the VM
-// ---------------------------------------------------------------------------
 
 fn handle_reset(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
@@ -194,10 +176,8 @@ fn handle_reset(request: str, client_fd: i32) -> void {
     api_send_json(client_fd, 200, "{\"ok\":true}");
 }
 
-// ---------------------------------------------------------------------------
 // POST /api/input - Provide input to a waiting VM
 // Body: {"session_id":"...","value":"42"}
-// ---------------------------------------------------------------------------
 
 fn handle_input(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);

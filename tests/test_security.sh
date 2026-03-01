@@ -1,11 +1,8 @@
 #!/bin/bash
-# ==========================================================================
 # BMC Security Test Suite
 # Tests common attack vectors against the custom HTTP server
-# Categories: Path Traversal, Header Injection, Request Smuggling,
-#   DoS Resilience, XSS, Auth Bypass, Cookie Attacks, Input Validation,
-#   Resource Exhaustion, Shell Injection, CORS, Session Fixation
-# ==========================================================================
+# Covers: path traversal, header injection, DoS, XSS, auth bypass,
+# cookie attacks, input validation, shell injection, CORS, sessions
 
 PORT=${1:-8080}
 BASE="http://localhost:$PORT"
@@ -342,7 +339,7 @@ echo ""
 echo -e "${YELLOW}=== 7. EXPORT / SHELL INJECTION ===${NC}"
 echo -e "  Testing command injection via export functionality"
 
-# Shell injection in program name — name is sanitised so compile may fail, but no shell escape
+# Shell injection in program name - name is sanitised so compile may fail, but no shell escape
 RESP=$(curl -s -X POST "$BASE/api/export" -H "Content-Type: application/json" \
     -d '{"code":"HLT","name":"; rm -rf /"}')
 # Server should not crash regardless of compile result
@@ -461,7 +458,7 @@ RESP=$(curl -s -X POST "$BASE/api/programs/save" -H "Content-Type: application/j
 check_contains "Program save with XSS code handled" '"ok"' "$RESP"
 sleep 0.3
 
-# Retrieve XSS program — JSON carries data safely; client uses textContent for rendering
+# Retrieve XSS program - JSON carries data safely; client uses textContent for rendering
 RESP=$(curl -s "$BASE/api/programs/list" -b "$COOKIE_FILE")
 check_contains "Listed programs returned as valid JSON" '"ok":true' "$RESP"
 sleep 0.3

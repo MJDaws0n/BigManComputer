@@ -1,15 +1,13 @@
-# =============================================================================
-# BMC (Big Man Computer) Docker Setup — Multi-Architecture
+# BMC (Big Man Computer) Docker Setup - Multi-Architecture
 #
-# Supports both linux/amd64 and linux/arm64 natively.
-# Downloads Novus compiler and Nox package manager, then uses nox to pull
+# Supports linux/amd64 and linux/arm64.
+# Downloads the Novus compiler and Nox package manager, then pulls
 # all library dependencies from the registry before compiling.
 #
 # Usage:
-#   docker compose build   → Recompiles the BMC application
-#   docker compose up      → Starts the server (no recompile)
-#   docker compose up -d   → Starts detached
-# =============================================================================
+#   docker compose build   - Recompile the BMC application
+#   docker compose up      - Start the server (no recompile)
+#   docker compose up -d   - Start detached
 
 # --- Build Stage ---
 FROM debian:bookworm-slim AS builder
