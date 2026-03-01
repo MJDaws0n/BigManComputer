@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    platform: linux/amd64
     ports:
       - "${BMC_PORT:-8080}:8080"
     volumes:

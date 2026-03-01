@@ -32,35 +32,7 @@ import src/api/export;
 // Configuration
 // ---------------------------------------------------------------------------
 
-// Non-blocking waitpid to reap zombie children without blocking
-
-#if(os == "darwin") {
-    fn waitpid_nohang() -> void {
-        let st: i32 = 0;
-        let sa: u64 = &st;
-        // waitpid(-1, &st, WNOHANG=1) — reap one finished child per call
-        mov(x0, -1);
-        mov(x1, sa);
-        mov(x2, 1);
-        mov(x3, 0);
-        mov(x16, 0x2000007);
-        syscall();
-    }
-}
-
-#if(os == "linux") {
-    fn waitpid_nohang() -> void {
-        let st: i32 = 0;
-        let sa: u64 = &st;
-        // wait4(-1, &st, WNOHANG=1, NULL)
-        mov(rax, 61);      // SYS_wait4
-        mov(rdi, -1);
-        mov(rsi, sa);
-        mov(rdx, 1);       // WNOHANG
-        mov(r10, 0);       // rusage = NULL
-        syscall();
-    }
-}
+// waitpid_nohang() is now provided by the process library for all platforms
 
 fn get_bmc_version() -> str {
     return "1.0.0";
