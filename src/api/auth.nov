@@ -9,9 +9,52 @@ import ../../lib/std/main;
 import ../../lib/net/main;
 import ../../lib/http/main;
 import ../../lib/time/main;
+import ../../lib/process/main;
+import ../../lib/file_io/main;
 
 import ../db;
 import ../hash;
+
+// ---------------------------------------------------------------------------
+// Read a value from the .env file by key name
+// Returns "" if not found
+// ---------------------------------------------------------------------------
+
+fn read_env_key(key: str) -> str {
+    let content: str = read_file(".env");
+    if (len(content) == 0) { return ""; }
+    let needle: str = key + "=";
+    let pos: i32 = str_find(content, needle);
+    if (pos < 0) { return ""; }
+    // Skip to value
+    let vstart: i32 = pos + len(needle);
+    let vend: i32 = vstart;
+    while (vend < len(content) && content[vend] != '\n' && content[vend] != '\r') {
+        vend = vend + 1;
+    }
+    return str_trim(substr_len(content, vstart, vend - vstart));
+}
+
+// ---------------------------------------------------------------------------
+// Validate AutoGate captcha token via the API
+// Returns true if valid (or if captcha is not configured)
+// ---------------------------------------------------------------------------
+
+fn validate_captcha(token: str) -> bool {
+    let private_key: str = read_env_key("AUTOGATE_PRIVATE");
+    if (len(private_key) == 0) {
+        return true;
+    }
+    if (len(token) == 0) {
+        return false;
+    }
+    let cmd: str = "/usr/bin/curl -s -X POST https://autogate.mjdawson.net/api/validate -d 'private_key=" + private_key + "&token=" + token + "'";
+    let resp: str = shell_output(cmd, 4096);
+    if (str_contains(resp, "\"valid\":true") || str_contains(resp, "\"valid\": true")) {
+        return true;
+    }
+    return false;
+}
 
 // ---------------------------------------------------------------------------
 // Initialise auth tables
@@ -106,6 +149,13 @@ fn handle_signup(request: str, client_fd: i32) -> void {
         return;
     }
 
+    // Validate captcha
+    let captcha_token: str = json_get_value(body, "captcha");
+    if (!validate_captcha(captcha_token)) {
+        api_send_json(client_fd, 403, "{\"ok\":false,\"error\":\"Human verification failed\"}");
+        return;
+    }
+
     let salt: str = make_salt(username);
     let pw_hash: str = hash_password(password, salt);
     let timestamp: str = i64_to_str(get_time_s());
@@ -132,6 +182,13 @@ fn handle_login(request: str, client_fd: i32) -> void {
     let body: str = api_get_body(request);
     let username: str = json_get_value(body, "username");
     let password: str = json_get_value(body, "password");
+
+    // Validate captcha
+    let captcha_token: str = json_get_value(body, "captcha");
+    if (!validate_captcha(captcha_token)) {
+        api_send_json(client_fd, 403, "{\"ok\":false,\"error\":\"Human verification failed\"}");
+        return;
+    }
 
     let user_row: str = db_find_by_field("users", 0, username);
     if (len(user_row) == 0) {

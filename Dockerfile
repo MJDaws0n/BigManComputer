@@ -52,7 +52,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 FROM debian:bookworm-slim
 
 # binutils needed for assembler/linker (user program export)
-RUN apt-get update && apt-get install -y --no-install-recommends binutils && \
+RUN apt-get update && apt-get install -y --no-install-recommends binutils curl ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
     useradd -r -s /bin/false bmc && mkdir -p /app/data && chown -R bmc:bmc /app
 

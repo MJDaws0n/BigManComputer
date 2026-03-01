@@ -9,6 +9,20 @@ PASS=0
 FAIL=0
 TOTAL=0
 
+# Disable captcha for testing by removing AUTOGATE keys from .env
+_BMC_ENV_MODIFIED=0
+if [ -f .env ] && grep -q "^AUTOGATE_" .env 2>/dev/null; then
+    _BMC_ENV_MODIFIED=1
+    cp .env .env.test_bak
+    grep -v "^AUTOGATE_" .env.test_bak > .env
+fi
+cleanup_env() {
+    if [ "$_BMC_ENV_MODIFIED" = "1" ] && [ -f .env.test_bak ]; then
+        mv .env.test_bak .env
+    fi
+}
+trap cleanup_env EXIT
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
