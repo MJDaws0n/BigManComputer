@@ -37,6 +37,8 @@ fn read_env_key(key: str) -> str {
 
 // ---------------------------------------------------------------------------
 // Validate AutoGate captcha token via the API
+// Uses capture_output to call curl directly (no shell) to avoid
+// token special chars breaking shell quoting
 // Returns true if valid (or if captcha is not configured)
 // ---------------------------------------------------------------------------
 
@@ -48,8 +50,19 @@ fn validate_captcha(token: str) -> bool {
     if (len(token) == 0) {
         return false;
     }
-    let cmd: str = "/usr/bin/curl -s -X POST https://autogate.mjdawson.net/api/validate -d 'private_key=" + private_key + "&token=" + token + "'";
-    let resp: str = shell_output(cmd, 4096);
+    let exe: str = "/usr/bin/curl";
+    let a1: str = "-s";
+    let a2: str = "--connect-timeout";
+    let a3: str = "5";
+    let a4: str = "--max-time";
+    let a5: str = "10";
+    let a6: str = "-X";
+    let a7: str = "POST";
+    let a8: str = "https://autogate.mjdawson.net/api/validate";
+    let a9: str = "-d";
+    let post_data: str = "private_key=" + private_key + "&token=" + token;
+    let av: []u64 = [ptr(exe), ptr(a1), ptr(a2), ptr(a3), ptr(a4), ptr(a5), ptr(a6), ptr(a7), ptr(a8), ptr(a9), ptr(post_data), 0];
+    let resp: str = capture_output(exe, av, 4096);
     if (str_contains(resp, "\"valid\":true") || str_contains(resp, "\"valid\": true")) {
         return true;
     }
