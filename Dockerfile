@@ -18,27 +18,18 @@ FROM debian:bookworm-slim AS builder
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    binutils curl ca-certificates git && \
+    binutils git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Download prebuilt Novus compiler matching the target architecture
-ARG NOVUS_VERSION=V0.1.2
-RUN curl -fSL -o /usr/local/bin/novus \
-    "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
-    chmod +x /usr/local/bin/novus
+# Use locally-built Novus compiler matching the target architecture
+# (These binaries include the argc/argv fix required for Linux)
+COPY novus-linux-${TARGETARCH} /usr/local/bin/novus
+RUN chmod +x /usr/local/bin/novus
 
-# Install Nox package manager: try pre-built binary, fall back to compiling from source
-ARG NOX_VERSION=V0.0.3
-RUN (curl -fSL -o /usr/local/bin/nox \
-    "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
-    chmod +x /usr/local/bin/nox) || \
-    (echo "Pre-built nox not available for ${TARGETARCH}, building from source..." && \
-     git clone --depth=1 https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
-     cd /tmp/nox-src && \
-     novus --target=linux/${TARGETARCH} main.nov && \
-     find build/ -name nox -type f | head -1 | xargs -I {} cp {} /usr/local/bin/nox && \
-     chmod +x /usr/local/bin/nox && \
-     rm -rf /tmp/nox-src)
+# Use locally-built Nox package manager matching the target architecture
+# (Built with the fixed Novus compiler, includes /usr/bin/git path fix)
+COPY nox-linux-${TARGETARCH} /usr/local/bin/nox
+RUN chmod +x /usr/local/bin/nox
 
 WORKDIR /app
 COPY . .

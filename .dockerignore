@@ -1,8 +1,8 @@
 # Git directories
 .git
 
-# Nox packages (installed via nox pull in Docker)
-lib/
+# Nox packages — only reinstall if missing
+# (Local lib/ included because GitHub repos may not have Linux support yet)
 
 # Build artifacts (rebuilt in container)
 build/
@@ -22,5 +22,4 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Novus compiler binary (built from source in Docker)
-novus-linux-amd64
+# (novus-linux-amd64 and novus-linux-arm64 are included for Docker builds)
