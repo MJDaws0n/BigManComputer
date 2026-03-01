@@ -26,39 +26,38 @@ RUN curl -fSL -o /usr/local/bin/novus \
     "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
     chmod +x /usr/local/bin/novus
 
-# Install Nox (build from source; release binaries can have broken argv handling)
+# Install Nox from the release binary; if it's broken, build from source.
+ARG NOX_VERSION=V0.0.3
 ARG NOX_REF=main
-RUN git clone --depth=1 --branch "${NOX_REF}" https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
-    cd /tmp/nox-src && \
-    novus --target=linux/${TARGETARCH} main.nov && \
-    find build/ -maxdepth 5 -type f -name nox -print -quit | xargs -I {} cp {} /usr/local/bin/nox && \
-    chmod +x /usr/local/bin/nox && \
-    rm -rf /tmp/nox-src
+RUN set -eu; \
+    if curl -fSL -o /usr/local/bin/nox \
+      "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}"; then \
+      chmod +x /usr/local/bin/nox; \
+      if nox version 2>/dev/null | grep -q "^nox v"; then \
+        exit 0; \
+      fi; \
+      echo "Downloaded nox is not functional; building from source..."; \
+    else \
+      echo "Failed to download nox; building from source..."; \
+    fi; \
+    git clone --depth=1 --branch "${NOX_REF}" https://github.com/MJDaws0n/Nox.git /tmp/nox-src; \
+    cd /tmp/nox-src; \
+    novus --target=linux/${TARGETARCH} main.nov; \
+    find build/ -maxdepth 5 -type f -name nox -print -quit | xargs -I {} cp {} /usr/local/bin/nox; \
+    chmod +x /usr/local/bin/nox; \
+    rm -rf /tmp/nox-src; \
+    nox version >/dev/null
 
 WORKDIR /app
 COPY . .
 
 # Use nox to install/update all library dependencies in the same folder as libraries.conf
-# (If nox fails, fall back to cloning directly from libraries.conf.)
 RUN set -eu; \
+    command -v git >/dev/null; git --version; \
+    command -v curl >/dev/null; \
     rm -rf lib; \
-    if nox init; then \
-      :; \
-    else \
-      echo "WARN: nox init failed; falling back to manual lib clone"; \
-      rm -rf lib; \
-      mkdir -p lib; \
-      installed="$(sed -n 's/^installed=//p' libraries.conf | head -n 1)"; \
-      for pkg in $(echo "$installed" | tr ',' ' '); do \
-        url="$(grep -m1 "^pkg:${pkg}:url=" libraries.conf | cut -d= -f2-)"; \
-        branch="$(grep -m1 "^pkg:${pkg}:branch=" libraries.conf | cut -d= -f2-)"; \
-        commit="$(grep -m1 "^pkg:${pkg}:commit=" libraries.conf | cut -d= -f2-)"; \
-        [ -n "$url" ] || { echo "Missing url for $pkg"; exit 1; }; \
-        [ -n "$branch" ] || branch=main; \
-        git clone --depth=1 --branch "$branch" "$url" "lib/$pkg"; \
-        if [ -n "$commit" ] && [ "$commit" != "HEAD" ]; then (cd "lib/$pkg" && git checkout "$commit"); fi; \
-      done; \
-    fi; \
+    nox version; \
+    nox init; \
     test -f lib/std/main.nov
 
 # Compile BMC for the target architecture
