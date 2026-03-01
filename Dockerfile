@@ -26,34 +26,40 @@ RUN curl -fSL -o /usr/local/bin/novus \
     "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
     chmod +x /usr/local/bin/novus
 
-# Build Nox package manager from source
-# (The published linux binaries may not handle argv correctly, which breaks `nox init`.)
+# Install Nox (build from source; release binaries can have broken argv handling)
 ARG NOX_REF=main
 RUN git clone --depth=1 --branch "${NOX_REF}" https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
     cd /tmp/nox-src && \
     novus --target=linux/${TARGETARCH} main.nov && \
     find build/ -maxdepth 5 -type f -name nox -print -quit | xargs -I {} cp {} /usr/local/bin/nox && \
     chmod +x /usr/local/bin/nox && \
-    rm -rf /tmp/nox-src && \
-    nox version >/dev/null
+    rm -rf /tmp/nox-src
 
 WORKDIR /app
 COPY . .
 
-# Use nox to install/update all library dependencies
-# Always reinstall in Docker so builds work from fresh clones (lib/ is gitignored).
+# Use nox to install/update all library dependencies in the same folder as libraries.conf
+# (If nox fails, fall back to cloning directly from libraries.conf.)
 RUN set -eu; \
     rm -rf lib; \
-    nox init; \
-    if [ ! -f lib/std/main.nov ]; then \
-      echo "ERROR: nox init did not populate /app/lib (expected lib/std/main.nov)"; \
-      echo "pwd=$(pwd)"; \
-      ls -la; \
-      ls -la lib || true; \
-      echo "--- libraries.conf"; \
-      sed -n '1,120p' libraries.conf || true; \
-      exit 1; \
-    fi
+    if nox init; then \
+      :; \
+    else \
+      echo "WARN: nox init failed; falling back to manual lib clone"; \
+      rm -rf lib; \
+      mkdir -p lib; \
+      installed="$(sed -n 's/^installed=//p' libraries.conf | head -n 1)"; \
+      for pkg in $(echo "$installed" | tr ',' ' '); do \
+        url="$(grep -m1 "^pkg:${pkg}:url=" libraries.conf | cut -d= -f2-)"; \
+        branch="$(grep -m1 "^pkg:${pkg}:branch=" libraries.conf | cut -d= -f2-)"; \
+        commit="$(grep -m1 "^pkg:${pkg}:commit=" libraries.conf | cut -d= -f2-)"; \
+        [ -n "$url" ] || { echo "Missing url for $pkg"; exit 1; }; \
+        [ -n "$branch" ] || branch=main; \
+        git clone --depth=1 --branch "$branch" "$url" "lib/$pkg"; \
+        if [ -n "$commit" ] && [ "$commit" != "HEAD" ]; then (cd "lib/$pkg" && git checkout "$commit"); fi; \
+      done; \
+    fi; \
+    test -f lib/std/main.nov
 
 # Compile BMC for the target architecture
 # Output goes to build/linux_x86_64/ (amd64) or build/linux_arm64/ (arm64)
