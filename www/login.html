@@ -55,29 +55,15 @@
         </div>
     </div>
 
-    <script src="https://autogate.mjdawson.net/lib/autogate.js" onerror="window._agFailed=true"></script>
+    <script src="https://autogate.mjdawson.net/lib/autogate.js"></script>
     <script src="/js/app.js"></script>
     <script>
         let captchaToken = '';
-        let captchaReady = false;
 
-        try {
-            if (typeof AutoGate !== 'undefined') {
-                const gate = new AutoGate('#captcha', 'd38ef9571362f1864b080ccfc7c9c966', {
-                    theme: 'dark'
-                });
-                gate.onSuccess = (token) => {
-                    captchaToken = token;
-                    captchaReady = true;
-                };
-            } else {
-                captchaReady = true;
-                document.getElementById('captcha').style.display = 'none';
-            }
-        } catch(err) {
-            captchaReady = true;
-            document.getElementById('captcha').style.display = 'none';
-        }
+        const gate = new AutoGate('#captcha', 'd38ef9571362f1864b080ccfc7c9c966', {
+            theme: 'dark'
+        });
+        gate.onSuccess = (token) => { captchaToken = token; };
 
         document.getElementById('login-form').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -86,7 +72,7 @@
             errorEl.style.display = 'none';
             document.getElementById('captcha-error').style.display = 'none';
 
-            if (typeof AutoGate !== 'undefined' && !captchaToken) {
+            if (!captchaToken) {
                 document.getElementById('captcha-error').style.display = 'block';
                 return;
             }

@@ -250,6 +250,17 @@ fn main(argc: i32, argv: u64) -> i32 {
 
     print_banner();
 
+    // Check .env exists at startup
+    if (!file_exists(".env")) {
+        print("[BMC] ERROR: Missing .env file");
+        print("[BMC] Create a .env file with at least:");
+        print("[BMC]   BMC_PORT=8080");
+        print("[BMC]   AUTOGATE_PUBLIC=your_public_key");
+        print("[BMC]   AUTOGATE_PRIVATE=your_private_key");
+        exit(1);
+        return 1;
+    }
+
     db_init();
     auth_init();
     programs_init();

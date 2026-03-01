@@ -26,7 +26,6 @@ fn read_env_key(key: str) -> str {
     let needle: str = key + "=";
     let pos: i32 = str_find(content, needle);
     if (pos < 0) { return ""; }
-    // Skip to value
     let vstart: i32 = pos + len(needle);
     let vend: i32 = vstart;
     while (vend < len(content) && content[vend] != '\n' && content[vend] != '\r') {
@@ -36,40 +35,44 @@ fn read_env_key(key: str) -> str {
 }
 
 // ---------------------------------------------------------------------------
-// Validate AutoGate captcha token via the API
-// Uses run_cmd + temp file (no pipes) to avoid potential hangs
-// Returns true if valid (or if captcha is not configured)
+// Validate AutoGate captcha token
+// POSTs to https://autogate.mjdawson.net/api/validate
+// Returns true if valid, or true if captcha not configured
 // ---------------------------------------------------------------------------
 
 fn validate_captcha(token: str) -> bool {
     let private_key: str = read_env_key("AUTOGATE_PRIVATE");
     if (len(private_key) == 0) {
+        print("[BMC] WARNING: AUTOGATE_PRIVATE not set - captcha disabled");
         return true;
     }
     if (len(token) == 0) {
+        print("[BMC] ERROR: Captcha token empty");
         return false;
     }
-    let tmp: str = "/tmp/bmc_captcha_" + i64_to_str(get_time_s()) + ".tmp";
     let exe: str = "/usr/bin/curl";
+    if (!file_exists(exe)) {
+        print("[BMC] ERROR: curl not found at /usr/bin/curl");
+        return false;
+    }
     let a1: str = "-s";
     let a2: str = "--connect-timeout";
-    let a3: str = "5";
+    let a3: str = "3";
     let a4: str = "--max-time";
-    let a5: str = "10";
-    let a6: str = "-o";
-    let a7: str = tmp;
-    let a8: str = "-X";
-    let a9: str = "POST";
-    let url: str = "https://autogate.mjdawson.net/api/validate";
-    let a10: str = "-d";
+    let a5: str = "5";
+    let a6: str = "-d";
     let post_data: str = "private_key=" + private_key + "&token=" + token;
-    let av: []u64 = [ptr(exe), ptr(a1), ptr(a2), ptr(a3), ptr(a4), ptr(a5), ptr(a6), ptr(a7), ptr(a8), ptr(a9), ptr(url), ptr(a10), ptr(post_data), 0];
-    run_cmd(exe, av);
-    let resp: str = read_file(tmp);
-    file_delete(tmp);
+    let url: str = "https://autogate.mjdawson.net/api/validate";
+    let av: []u64 = [ptr(exe), ptr(a1), ptr(a2), ptr(a3), ptr(a4), ptr(a5), ptr(a6), ptr(post_data), ptr(url), 0];
+    let resp: str = capture_output(exe, av, 4096);
+    if (len(resp) == 0) {
+        print("[BMC] ERROR: Captcha validation got empty response from AutoGate");
+        return false;
+    }
     if (str_contains(resp, "\"valid\":true") || str_contains(resp, "\"valid\": true")) {
         return true;
     }
+    print("[BMC] Captcha rejected: " + resp);
     return false;
 }
 
@@ -166,7 +169,7 @@ fn handle_signup(request: str, client_fd: i32) -> void {
         return;
     }
 
-    // Validate captcha
+    // Check captcha token was provided (validated client-side)
     let captcha_token: str = json_get_value(body, "captcha");
     if (!validate_captcha(captcha_token)) {
         api_send_json(client_fd, 403, "{\"ok\":false,\"error\":\"Human verification failed\"}");
@@ -200,7 +203,7 @@ fn handle_login(request: str, client_fd: i32) -> void {
     let username: str = json_get_value(body, "username");
     let password: str = json_get_value(body, "password");
 
-    // Validate captcha
+    // Check captcha token was provided (validated client-side)
     let captcha_token: str = json_get_value(body, "captcha");
     if (!validate_captcha(captcha_token)) {
         api_send_json(client_fd, 403, "{\"ok\":false,\"error\":\"Human verification failed\"}");

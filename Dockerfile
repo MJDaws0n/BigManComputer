@@ -68,11 +68,12 @@ COPY --from=builder /app/src/ ./src/
 COPY --from=builder /app/main.nov ./
 COPY --from=builder /app/libraries.conf ./
 
-# Ensure data dir exists and is writable
-RUN mkdir -p /app/data && chown -R bmc:bmc /app/data
+# Ensure data dir and app root are writable by bmc (for .env generation at runtime)
+RUN mkdir -p /app/data && chown -R bmc:bmc /app
 
 EXPOSE ${BMC_PORT:-8080}
 
 USER bmc
 
-ENTRYPOINT ["/bin/sh", "-c", "exec ./build/app/BigManComputer --port ${BMC_PORT:-8080}"]
+# Generate .env from environment variables at runtime so read_env_key() works
+ENTRYPOINT ["/bin/sh", "-c", "printf 'BMC_PORT=%s\\nAUTOGATE_PUBLIC=%s\\nAUTOGATE_PRIVATE=%s\\n' \"${BMC_PORT:-8080}\" \"$AUTOGATE_PUBLIC\" \"$AUTOGATE_PRIVATE\" > .env && exec ./build/app/BigManComputer --port ${BMC_PORT:-8080}"]
