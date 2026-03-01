@@ -10,9 +10,10 @@
 # =============================================================================
 
 # --- Build Stage ---
-FROM debian:bookworm-slim AS builder
+# Build runs on the TARGETPLATFORM so the installed binutils matches the target
+# (Novus invokes the system assembler/linker).
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS builder
 
-# TARGETARCH is set automatically by Docker BuildKit (amd64 or arm64)
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,7 +26,7 @@ RUN curl -fSL -o /usr/local/bin/novus \
     "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
     chmod +x /usr/local/bin/novus
 
-# Install Nox package manager (not required at runtime, but kept for dev/tooling)
+# Install Nox package manager
 ARG NOX_VERSION=V0.0.3
 RUN (curl -fSL -o /usr/local/bin/nox \
     "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
@@ -40,6 +41,9 @@ RUN (curl -fSL -o /usr/local/bin/nox \
 
 WORKDIR /app
 COPY . .
+
+# Use nox to install/update all library dependencies
+RUN nox init
 
 # Compile BMC for the target architecture
 # Output goes to build/linux_x86_64/ (amd64) or build/linux_arm64/ (arm64)
