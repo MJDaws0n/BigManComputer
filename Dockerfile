@@ -44,14 +44,7 @@ WORKDIR /app
 COPY . .
 
 # Use nox to install all library dependencies from the registry
-RUN nox pull std && \
-    nox pull net && \
-    nox pull http && \
-    nox pull file_io && \
-    nox pull process && \
-    nox pull env && \
-    nox pull time && \
-    nox pull maths
+RUN nox init
 
 # Compile BMC for the target architecture
 # Output goes to build/linux_x86_64/ (amd64) or build/linux_arm64/ (arm64)
