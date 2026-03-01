@@ -2,39 +2,47 @@
 # BMC (Big Man Computer) Docker Setup — Multi-Architecture
 #
 # Supports both linux/amd64 and linux/arm64 natively.
-# Downloads Novus compiler and Nox package manager, then uses nox to pull
-# all library dependencies from the registry before compiling.
+# Downloads Novus compiler and Nox package manager, compiles BMC, then runs it.
 #
-# Usage:
-#   docker compose build   → Recompiles the BMC application
-#   docker compose up      → Starts the server (no recompile)
-#   docker compose up -d   → Starts detached
+# Runtime notes:
+# - BMC requires a .env file; this image generates one from env vars if missing.
+# - AutoGate captcha validation uses /usr/bin/curl (installed in runtime stage).
 # =============================================================================
 
 # --- Build Stage ---
-FROM debian:bookworm-slim AS builder
+# Build runs on the TARGETPLATFORM so the installed binutils matches the target
+# (Novus invokes the system assembler/linker).
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS builder
 
-# TARGETARCH is set automatically by Docker BuildKit (amd64 or arm64)
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    binutils git ca-certificates && \
+    binutils curl ca-certificates git && \
     rm -rf /var/lib/apt/lists/*
 
-# Use locally-built Novus compiler matching the target architecture
-# (These binaries include the argc/argv fix required for Linux)
-COPY novus-linux-${TARGETARCH} /usr/local/bin/novus
-RUN chmod +x /usr/local/bin/novus
+# Download prebuilt Novus compiler matching the target architecture
+ARG NOVUS_VERSION=V0.1.2
+RUN curl -fSL -o /usr/local/bin/novus \
+    "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
+    chmod +x /usr/local/bin/novus
 
-# Use locally-built Nox package manager matching the target architecture
-# (Built with the fixed Novus compiler, includes /usr/bin/git path fix)
-COPY nox-linux-${TARGETARCH} /usr/local/bin/nox
-RUN chmod +x /usr/local/bin/nox
+# Install Nox package manager
+ARG NOX_VERSION=V0.0.3
+RUN (curl -fSL -o /usr/local/bin/nox \
+    "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
+    chmod +x /usr/local/bin/nox) || \
+    (echo "Pre-built nox not available for ${TARGETARCH}, building from source..." && \
+     git clone --depth=1 https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
+     cd /tmp/nox-src && \
+     novus --target=linux/${TARGETARCH} main.nov && \
+     find build/ -name nox -type f | head -1 | xargs -I {} cp {} /usr/local/bin/nox && \
+     chmod +x /usr/local/bin/nox && \
+     rm -rf /tmp/nox-src)
 
 WORKDIR /app
 COPY . .
 
-# Use nox to install all library dependencies from the registry
+# Use nox to install/update all library dependencies
 RUN nox init
 
 # Compile BMC for the target architecture
@@ -52,13 +60,17 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 FROM debian:bookworm-slim
 
 # binutils needed for assembler/linker (user program export)
-RUN apt-get update && apt-get install -y --no-install-recommends binutils && \
+# curl needed for AutoGate captcha validation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      binutils curl ca-certificates && \
     rm -rf /var/lib/apt/lists/* && \
-    useradd -r -s /bin/false bmc && mkdir -p /app/data && chown -R bmc:bmc /app
+    useradd -r -s /bin/false bmc && \
+    mkdir -p /app/data /app/build && \
+    chown -R bmc:bmc /app
 
 WORKDIR /app
 
-# Copy Novus compiler for runtime compilation (exports)
+# Novus compiler is required at runtime for export compilation
 COPY --from=builder /usr/local/bin/novus /usr/local/bin/novus
 
 COPY --from=builder /app/build/app/ ./build/app/
@@ -68,12 +80,11 @@ COPY --from=builder /app/src/ ./src/
 COPY --from=builder /app/main.nov ./
 COPY --from=builder /app/libraries.conf ./
 
-# Ensure data dir exists and is writable
-RUN mkdir -p /app/data && chown -R bmc:bmc /app/data
+# Ensure runtime write dirs are owned by the non-root user
+RUN mkdir -p /app/data /app/build && chown -R bmc:bmc /app
 
 EXPOSE 8080
 
 USER bmc
 
-ENTRYPOINT ["./build/app/BigManComputer"]
-CMD ["--port", "8080"]
+ENTRYPOINT ["/bin/sh", "-c", "set -eu; PORT=\"${BMC_PORT:-${PORT:-8080}}\"; if [ ! -f .env ]; then printf 'BMC_PORT=%s\\nAUTOGATE_PUBLIC=%s\\nAUTOGATE_PRIVATE=%s\\n' \"$PORT\" \"${AUTOGATE_PUBLIC:-}\" \"${AUTOGATE_PRIVATE:-}\" > .env; fi; exec ./build/app/BigManComputer --port \"$PORT\"" ]
