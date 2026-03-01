@@ -3,14 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "${BMC_PORT:-8080}:8080"
+    expose:
+      - "${BMC_PORT:-8080}"
     volumes:
-      # Persist user data across container restarts
       - bmc-data:/app/data
     restart: unless-stopped
     environment:
-      - BMC_PORT=8080
+      - BMC_PORT=${BMC_PORT:-8080}
 
 volumes:
   bmc-data:

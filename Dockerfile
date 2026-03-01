@@ -71,9 +71,8 @@ COPY --from=builder /app/libraries.conf ./
 # Ensure data dir exists and is writable
 RUN mkdir -p /app/data && chown -R bmc:bmc /app/data
 
-EXPOSE 8080
+EXPOSE ${BMC_PORT:-8080}
 
 USER bmc
 
-ENTRYPOINT ["./build/app/BigManComputer"]
-CMD ["--port", "8080"]
+ENTRYPOINT ["/bin/sh", "-c", "exec ./build/app/BigManComputer --port ${BMC_PORT:-8080}"]
