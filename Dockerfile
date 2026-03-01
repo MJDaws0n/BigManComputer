@@ -26,24 +26,34 @@ RUN curl -fSL -o /usr/local/bin/novus \
     "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
     chmod +x /usr/local/bin/novus
 
-# Install Nox package manager
-ARG NOX_VERSION=V0.0.3
-RUN (curl -fSL -o /usr/local/bin/nox \
-    "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
-    chmod +x /usr/local/bin/nox) || \
-    (echo "Pre-built nox not available for ${TARGETARCH}, building from source..." && \
-     git clone --depth=1 https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
-     cd /tmp/nox-src && \
-     novus --target=linux/${TARGETARCH} main.nov && \
-     find build/ -name nox -type f | head -1 | xargs -I {} cp {} /usr/local/bin/nox && \
-     chmod +x /usr/local/bin/nox && \
-     rm -rf /tmp/nox-src)
+# Build Nox package manager from source
+# (The published linux binaries may not handle argv correctly, which breaks `nox init`.)
+ARG NOX_REF=main
+RUN git clone --depth=1 --branch "${NOX_REF}" https://github.com/MJDaws0n/Nox.git /tmp/nox-src && \
+    cd /tmp/nox-src && \
+    novus --target=linux/${TARGETARCH} main.nov && \
+    find build/ -maxdepth 5 -type f -name nox -print -quit | xargs -I {} cp {} /usr/local/bin/nox && \
+    chmod +x /usr/local/bin/nox && \
+    rm -rf /tmp/nox-src && \
+    nox version >/dev/null
 
 WORKDIR /app
 COPY . .
 
 # Use nox to install/update all library dependencies
-RUN nox init
+# Always reinstall in Docker so builds work from fresh clones (lib/ is gitignored).
+RUN set -eu; \
+    rm -rf lib; \
+    nox init; \
+    if [ ! -f lib/std/main.nov ]; then \
+      echo "ERROR: nox init did not populate /app/lib (expected lib/std/main.nov)"; \
+      echo "pwd=$(pwd)"; \
+      ls -la; \
+      ls -la lib || true; \
+      echo "--- libraries.conf"; \
+      sed -n '1,120p' libraries.conf || true; \
+      exit 1; \
+    fi
 
 # Compile BMC for the target architecture
 # Output goes to build/linux_x86_64/ (amd64) or build/linux_arm64/ (arm64)
