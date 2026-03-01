@@ -190,7 +190,7 @@ fn handle_signup(request: str, client_fd: i32) -> void {
     db_append_row("sessions", session_row);
 
     let resp: str = "{\"ok\":true,\"username\":\"" + json_escape(username) + "\"}";
-    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800";
+    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=15768000";
     api_send_json_cookie(client_fd, 200, resp, cookie);
 }
 
@@ -230,7 +230,7 @@ fn handle_login(request: str, client_fd: i32) -> void {
     db_append_row("sessions", session_row);
 
     let resp: str = "{\"ok\":true,\"username\":\"" + json_escape(username) + "\"}";
-    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800";
+    let cookie: str = "bmc_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=15768000";
     api_send_json_cookie(client_fd, 200, resp, cookie);
 }
 

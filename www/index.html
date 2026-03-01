@@ -101,7 +101,7 @@
             <div class="feature-card">
                 <div class="feature-icon">📦</div>
                 <h3>Export to Native</h3>
-                <p>Compile your BMC program to a real native executable via the Novus compiler.</p>
+                <p>Compile your BMC program to real assembly code, ready to be ran on your own machine.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">💾</div>
@@ -123,19 +123,49 @@
                 <span class="code-dot red"></span>
                 <span class="code-dot yellow"></span>
                 <span class="code-dot green"></span>
-                <span class="code-title">hello.bmc</span>
+                <span class="code-title">hello_world.bmc</span>
             </div>
-            <pre class="code-body"><code>; Add two numbers together
-        INP          ; Get first number
-        STA num1     ; Store it
-        INP          ; Get second number
-        ADD num1     ; Add first number
-        OUT          ; Display result
-        HLT          ; Stop
+            <pre class="code-body"><code>; Output Hello, World!
+                LDA H
+                OTC
+                LDA e
+                OTC
+                LDA l
+                OTC
+                OTC        ; Same letter twice means you
+                        ; don't have to re-load into memory
+                LDA o
+                OTC
+                LDA comma
+                OTC
+                LDA space
+                OTC
+                LDA W
+                OTC
+                LDA o
+                OTC
+                LDA r
+                OTC
+                LDA l
+                OTC
+                LDA d
+                OTC
+                LDA explanation
+                OTC
 
-num1:   DAT 0        ; Storage for first number</code></pre>
+        ; Define the ascii value for each letter we want
+        H: DAT 72
+        e: DAT 101
+        l: DAT 108
+        o: DAT 111
+        comma: DAT 44
+        space: DAT 32
+        W: DAT 87
+        r: DAT 114
+        d: DAT 100
+        explanation: DAT 33</code></pre>
         </div>
-        <p class="example-desc">This program asks for two numbers, adds them, and displays the result.</p>
+        <p class="example-desc">This program prints "Hello, World!" to the output.</p>
         <a href="#" class="btn btn-primary" id="btn-try-example" onclick="localStorage.setItem('bmc_autosave',document.querySelector('.code-body code').textContent);window.location.href='/editor';return false;">Try This in the Editor →</a>
     </section>
 
