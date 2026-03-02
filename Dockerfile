@@ -26,27 +26,12 @@ RUN curl -fSL -o /usr/local/bin/novus \
     "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
     chmod +x /usr/local/bin/novus
 
-# Install Nox from the release binary; if it's broken, build from source.
-ARG NOX_VERSION=V0.0.3
-ARG NOX_REF=main
-RUN set -eu; \
-    if curl -fSL -o /usr/local/bin/nox \
-      "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}"; then \
-      chmod +x /usr/local/bin/nox; \
-      if nox version 2>/dev/null | grep -q "^nox v"; then \
-        exit 0; \
-      fi; \
-      echo "Downloaded nox is not functional; building from source..."; \
-    else \
-      echo "Failed to download nox; building from source..."; \
-    fi; \
-    git clone --depth=1 --branch "${NOX_REF}" https://github.com/MJDaws0n/Nox.git /tmp/nox-src; \
-    cd /tmp/nox-src; \
-    novus --target=linux/${TARGETARCH} main.nov; \
-    find build/ -maxdepth 5 -type f -name nox -print -quit | xargs -I {} cp {} /usr/local/bin/nox; \
-    chmod +x /usr/local/bin/nox; \
-    rm -rf /tmp/nox-src; \
-    nox version >/dev/null
+# Install Nox from a tagged release binary (must exist for both amd64+arm64)
+ARG NOX_VERSION=V0.0.4
+RUN curl -fSL -o /usr/local/bin/nox \
+    "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
+  chmod +x /usr/local/bin/nox && \
+  nox version | grep -q "^nox v"
 
 WORKDIR /app
 COPY . .
@@ -77,7 +62,7 @@ FROM debian:bookworm-slim
 # binutils needed for assembler/linker (user program export)
 # curl needed for AutoGate captcha validation
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      binutils curl ca-certificates && \
+      binutils curl ca-certificates git && \
     rm -rf /var/lib/apt/lists/* && \
     useradd -r -s /bin/false bmc && \
     mkdir -p /app/data /app/build && \
@@ -87,6 +72,8 @@ WORKDIR /app
 
 # Novus compiler is required at runtime for export compilation
 COPY --from=builder /usr/local/bin/novus /usr/local/bin/novus
+# Nox is useful for managing libs inside the container
+COPY --from=builder /usr/local/bin/nox /usr/local/bin/nox
 
 COPY --from=builder /app/build/app/ ./build/app/
 COPY --from=builder /app/www/ ./www/
