@@ -54,6 +54,52 @@ fn parse_port(argc: i32, argv: u64) -> i32 {
     return port;
 }
 
+fn has_port_arg(argc: i32, argv: u64) -> bool {
+    let i: i32 = 1;
+    while (i < argc) {
+        let arg: str = argv_get(argv, i);
+        if (arg == "--port" || starts_with(arg, "--port=")) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn read_dotenv_key(key: str) -> str {
+    if (!file_exists(".env")) { return ""; }
+    let content: str = read_file(".env");
+    if (len(content) == 0) { return ""; }
+    let needle: str = key + "=";
+    let pos: i32 = str_find(content, needle);
+    if (pos < 0) { return ""; }
+    let vstart: i32 = pos + len(needle);
+    let vend: i32 = vstart;
+    while (vend < len(content) && content[vend] != '\n' && content[vend] != '\r') {
+        vend = vend + 1;
+    }
+    return str_trim(substr_len(content, vstart, vend - vstart));
+}
+
+fn resolve_port(argc: i32, argv: u64) -> i32 {
+    let port: i32 = 8080;
+
+    let port_str: str = read_dotenv_key("BMC_PORT");
+    if (len(port_str) == 0) { port_str = read_dotenv_key("PORT"); }
+    if (len(port_str) == 0) { port_str = getenv("BMC_PORT"); }
+    if (len(port_str) == 0) { port_str = getenv("PORT"); }
+
+    if (len(port_str) > 0) {
+        let p: i32 = str_to_i32(port_str);
+        if (p > 0) { port = p; }
+    }
+
+    // If argv works, allow explicit CLI override.
+    if (has_port_arg(argc, argv)) {
+        port = parse_port(argc, argv);
+    }
+
+    return port;
+}
+
 fn parse_debug(argc: i32, argv: u64) -> bool {
     let i: i32 = 1;
     while (i < argc) {
@@ -227,7 +273,6 @@ fn print_banner() -> void {
 fn main(argc: i32, argv: u64) -> i32 {
     net_ignore_sigpipe();
 
-    let port: i32 = parse_port(argc, argv);
     let debug: bool = parse_debug(argc, argv);
 
     print_banner();
@@ -243,6 +288,8 @@ fn main(argc: i32, argv: u64) -> i32 {
         return 1;
     }
 
+    let port: i32 = resolve_port(argc, argv);
+
     db_init();
     auth_init();
     programs_init();
@@ -257,7 +304,7 @@ fn main(argc: i32, argv: u64) -> i32 {
         return 1;
     }
 
-    print("[BMC] Server running at http://localhost:" + i32_to_str(port));
+    print("[BMC] Server running at http://0.0.0.0:" + i32_to_str(port));
     print("[BMC] Press Ctrl+C to stop");
     print("");
 
