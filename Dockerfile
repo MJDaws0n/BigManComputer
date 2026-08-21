@@ -10,9 +10,9 @@
 # =============================================================================
 
 # --- Build Stage ---
-# Build runs on the TARGETPLATFORM so the installed binutils matches the target
-# (Novus invokes the system assembler/linker).
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS builder
+# BuildKit already runs this stage on TARGETPLATFORM, so the installed binutils
+# match the target architecture (Novus invokes the system assembler/linker).
+FROM debian:bookworm-slim AS builder
 
 ARG TARGETARCH
 
@@ -21,17 +21,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Download prebuilt Novus compiler matching the target architecture
-ARG NOVUS_VERSION=V0.1.3
-RUN curl -fSL -o /usr/local/bin/novus \
-    "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
+ARG NOVUS_VERSION=v0.2.9
+ARG NOVUS_SHA256_AMD64=10e2d2b0187e8b3ed4f50727df2d65481ed789e48135a631358cf6fa05bceef9
+ARG NOVUS_SHA256_ARM64=cec942df8ef529a6165af11b969659e0e0f4b7f9d6d36c7172913440ceda76fd
+RUN case "${TARGETARCH}" in \
+      amd64) NOVUS_SHA256="${NOVUS_SHA256_AMD64}" ;; \
+      arm64) NOVUS_SHA256="${NOVUS_SHA256_ARM64}" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fSL -o /usr/local/bin/novus \
+      "https://github.com/MJDaws0n/Novus/releases/download/${NOVUS_VERSION}/novus-linux-${TARGETARCH}" && \
+    echo "${NOVUS_SHA256}  /usr/local/bin/novus" | sha256sum -c - && \
     chmod +x /usr/local/bin/novus
 
-# Install Nox from a tagged release binary (must exist for both amd64+arm64)
-ARG NOX_VERSION=V0.0.4
-RUN curl -fSL -o /usr/local/bin/nox \
-    "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
-  chmod +x /usr/local/bin/nox && \
-  nox version | grep -q "^nox v"
+# Install a checksummed Nox release with reliable Linux package pulls.
+ARG NOX_VERSION=v3.4.2
+ARG NOX_SHA256_AMD64=b4bcc9666f2be0f765335d15b136dfef753dad898284910cb737ed83e212312a
+ARG NOX_SHA256_ARM64=d8fbb0552ce6405bf8ff91c18cd8ef7efd2db0f9f69da370906b08e7a534635b
+RUN case "${TARGETARCH}" in \
+      amd64) NOX_SHA256="${NOX_SHA256_AMD64}" ;; \
+      arm64) NOX_SHA256="${NOX_SHA256_ARM64}" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fSL -o /usr/local/bin/nox \
+      "https://github.com/MJDaws0n/Nox/releases/download/${NOX_VERSION}/nox-linux-${TARGETARCH}" && \
+    echo "${NOX_SHA256}  /usr/local/bin/nox" | sha256sum -c - && \
+    chmod +x /usr/local/bin/nox && \
+    nox version | grep -q "^nox v3.4.2$"
 
 WORKDIR /app
 COPY . .
