@@ -1,0 +1,30 @@
+name: Docker build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build production image
+        run: docker build --pull -t bmc-ci:test .
+      - name: Run application tests
+        run: |
+          set -eu
+          container_name=bmc-ci-test
+          cleanup() {
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker run --rm -d --name "$container_name" \
+            -p 127.0.0.1:18080:8080 bmc-ci:test
+          bash tests/test_all.sh 18080
+          bash tests/test_security.sh 18080
